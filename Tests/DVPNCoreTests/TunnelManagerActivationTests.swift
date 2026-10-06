@@ -12,7 +12,10 @@ import Testing
 /// What `TunnelManager` does when a start fails: on-demand goes off and the attempt stops,
 /// a proxy engine's recorded reason reaches the error, and a WireGuard tunnel without a first handshake
 /// is stopped.
+///
+/// Every proxy start clears the shared `ProxyStartErrorStore` (App Group defaults), so the suite runs serially.
 @MainActor
+@Suite(.serialized)
 struct TunnelManagerActivationTests {
     private let configuration = DVPNCoreConfiguration(
         appGroupID: "group.com.example.vpn.tests",
