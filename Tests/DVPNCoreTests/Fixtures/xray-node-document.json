@@ -1,0 +1,111 @@
+{
+  "env" : {
+    "xray.location.asset" : "\/var\/assets"
+  },
+  "inbounds" : [
+    {
+      "listen" : "[::1]",
+      "port" : 10808,
+      "protocol" : "socks",
+      "settings" : {
+        "accounts" : [
+          {
+            "pass" : "pass",
+            "user" : "user"
+          }
+        ],
+        "auth" : "password",
+        "udp" : true
+      },
+      "sniffing" : {
+        "destOverride" : [
+          "http",
+          "tls"
+        ],
+        "enabled" : true,
+        "excludedDomains" : [
+
+        ],
+        "metadataOnly" : false,
+        "routeOnly" : false
+      },
+      "tag" : "socks-in"
+    }
+  ],
+  "outbounds" : [
+    {
+      "protocol" : "vless",
+      "settings" : {
+        "vnext" : [
+          {
+            "address" : "203.0.113.5",
+            "port" : 38808,
+            "users" : [
+              {
+                "encryption" : "none",
+                "flow" : "xtls-rprx-vision",
+                "id" : "11111111-2222-3333-4444-555555555555",
+                "level" : 0
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings" : {
+        "network" : "tcp",
+        "realitySettings" : {
+          "fingerprint" : "chrome",
+          "publicKey" : "SOJ1ByzX8rQZ6KJ7z5nY2F9A4fVpzB0rQdL6wMhzk9Q",
+          "serverName" : "www.example.com",
+          "shortId" : "0123456789abcdef",
+          "show" : false,
+          "spiderX" : ""
+        },
+        "security" : "reality",
+        "sockopt" : {
+          "dialerProxy" : "fragment"
+        },
+        "tcpSettings" : {
+          "header" : {
+            "type" : "none"
+          }
+        }
+      },
+      "tag" : "proxy"
+    },
+    {
+      "protocol" : "freedom",
+      "settings" : {
+        "fragment" : {
+          "interval" : "10-20",
+          "length" : "100-200",
+          "packets" : "tlshello"
+        }
+      },
+      "streamSettings" : {
+        "sockopt" : {
+          "tcpNoDelay" : true
+        }
+      },
+      "tag" : "fragment"
+    },
+    {
+      "protocol" : "freedom",
+      "tag" : "direct"
+    },
+    {
+      "protocol" : "blackhole",
+      "tag" : "block"
+    }
+  ],
+  "routing" : {
+    "balancers" : [
+
+    ],
+    "domainMatcher" : "hybrid",
+    "domainStrategy" : "AsIs",
+    "rules" : [
+
+    ]
+  }
+}

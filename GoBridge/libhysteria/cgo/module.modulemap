@@ -1,0 +1,5 @@
+module LibHysteria {
+  umbrella header "libhysteria.h"
+  export *
+  module * { export * }
+}

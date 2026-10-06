@@ -1,0 +1,54 @@
+--- a/tls.go
++++ b/tls.go
+@@ -50,7 +50,6 @@
+ 	"sync"
+ 	"time"
+ 
+-	"github.com/juju/ratelimit"
+ 	"github.com/pires/go-proxyproto"
+ 	"golang.org/x/crypto/curve25519"
+ 	"golang.org/x/crypto/hkdf"
+@@ -101,39 +100,11 @@
+ 	return nil
+ }
+ 
+-type RatelimitedConn struct {
+-	net.Conn
+-	After  int64
+-	Bucket *ratelimit.Bucket
+-}
+-
+-func (c *RatelimitedConn) Read(b []byte) (int, error) {
+-	n, err := c.Conn.Read(b)
+-	if n != 0 {
+-		if c.After > 0 {
+-			c.After -= int64(n)
+-		} else {
+-			c.Bucket.Wait(int64(n))
+-		}
+-	}
+-	return n, err
+-}
+-
++// NewRatelimitedConn returns conn unchanged: this build does not limit a server's fallback traffic.
++// The limiter was built on juju/ratelimit, which is LGPL-3.0, and only a REALITY server uses it.
++// Modified from github.com/xtls/reality v0.0.0-20260908062103-8cdf7bf9c7f0 (MPL-2.0).
+ func NewRatelimitedConn(conn net.Conn, limit *LimitFallback) net.Conn {
+-	if limit.BytesPerSec == 0 {
+-		return conn
+-	}
+-
+-	burstBytesPerSec := limit.BurstBytesPerSec
+-	if burstBytesPerSec < limit.BytesPerSec {
+-		burstBytesPerSec = limit.BytesPerSec
+-	}
+-
+-	return &RatelimitedConn{
+-		Conn:   conn,
+-		After:  int64(limit.AfterBytes),
+-		Bucket: ratelimit.NewBucketWithRate(float64(limit.BytesPerSec), int64(burstBytesPerSec)),
+-	}
++	return conn
+ }
+ 
+ var (

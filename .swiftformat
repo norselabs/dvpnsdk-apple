@@ -1,0 +1,28 @@
+# Run by scripts/check.sh and the pre-commit hook. WireGuardKit stays as upstream wrote it.
+
+--exclude Sources/WireGuardKit,Sources/WireGuardKitC,Tests/WireGuardKitTests,Tests/WireGuardKitGoStub
+
+--swiftversion 6.0
+
+--indent 4
+--maxwidth none
+--trimwhitespace always
+--stripunusedargs closure-only
+--ifdef outdent
+# os.Logger's message is an autoclosure: `self.` stays explicit inside it.
+--selfrequired log,trace,debug,info,notice,warning,error,critical,fault
+
+# Keeps hand-aligned columns in tables of constants.
+--disable consecutiveSpaces
+# `await`/`try` stay where the expression needs them, as in the apps.
+--disable hoistAwait,hoistTry
+# Switches return explicitly from every case.
+--disable redundantReturn
+# Removing a SwiftUI Group changes which views its modifiers apply to.
+--disable redundantSwiftUIGroup
+# Turns constant-holding structs into enums; a public-API decision, not formatting.
+--disable enumNamespaces
+# One-line `if`/property/function bodies are fine.
+--disable wrapIfStatementBodies,wrapPropertyBodies,wrapFunctionBodies
+# Literal numbers (coordinates, sizes) read better as written.
+--disable numberFormatting

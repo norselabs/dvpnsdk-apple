@@ -1,0 +1,11 @@
+.DS_Store
+/.build
+/Packages
+xcuserdata/
+DerivedData/
+.swiftpm/
+
+# The engines: produced by scripts/build-*.sh
+Frameworks/*.xcframework
+Frameworks/*.version
+Frameworks/*.licenses.json

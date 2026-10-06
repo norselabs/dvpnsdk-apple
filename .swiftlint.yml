@@ -1,0 +1,89 @@
+# Run with --strict by scripts/check.sh and the pre-commit hook. SwiftFormat owns layout, so whitespace rules are
+# off here. WireGuardKit stays as upstream wrote it.
+included:
+  - Sources
+  - Tests
+excluded:
+  - GoBridge
+  - Frameworks
+  - Sources/WireGuardKit
+  - Sources/WireGuardKitC
+  - Tests/WireGuardKitTests
+  - Tests/WireGuardKitGoStub
+
+disabled_rules:
+  # Strings are made from JSON-encoder output, which is valid UTF-8 by construction; the failable
+  # initializer would add an impossible failure path to every call.
+  - optional_data_string_conversion
+  # Layout belongs to SwiftFormat.
+  - opening_brace
+  - trailing_comma
+  - trailing_newline
+  - trailing_whitespace
+  - vertical_whitespace
+  # Short names (`ip`, `id`, wire keys) are the clearest names where they appear.
+  - identifier_name
+
+nesting:
+  type_level: 3
+# Long user-facing copy and preview fixtures stay on one line.
+line_length:
+  warning: 150
+  ignores_urls: true
+  ignores_comments: true
+  ignores_interpolated_strings: true
+  excluded_lines_patterns:
+    - '^\s*(\w+: )?".*",?\)?$'
+cyclomatic_complexity:
+  ignores_case_statements: true
+function_body_length:
+  warning: 80
+type_body_length:
+  warning: 300
+file_length:
+  warning: 500
+  ignore_comment_only_lines: true
+
+custom_rules:
+  no_gcd:
+    name: "No GCD"
+    # A `DispatchQueue(label:)` handed to Network.framework (NWConnection, NWListener, NWPathMonitor,
+    # sec_protocol verify blocks) is the one legitimate use; dispatching work on a queue is not.
+    regex: '\bDispatch(Group|Semaphore|Time)\b|\bDispatchQueue\.(main|global)\b|\.async(After)?\s*[({]'
+    match_kinds: [identifier, typeidentifier]
+    message: "Use async/await; a queue exists only to hand to a Network.framework API."
+    severity: error
+  no_combine:
+    name: "No Combine"
+    regex: '(\bimport\s+Combine\b)|(\.sink\b)|(\bEffect\.publisher\b)'
+    match_kinds: [keyword, identifier, typeidentifier]
+    message: "No Combine: use async sequences."
+    severity: error
+  dependency_values_are_constants:
+    name: "Dependency values are let"
+    regex: '\bstatic\s+var\s+(liveValue|testValue|previewValue)\b'
+    match_kinds: [keyword, identifier]
+    message: "Declare liveValue/testValue/previewValue with `static let`."
+    severity: error
+  unchecked_sendable_is_justified:
+    name: "@unchecked Sendable is justified"
+    regex: '^(?![ \t]*//[^\n]*@unchecked)(?![^\n]*@unchecked Sendable)[^\n]*\n[^\n]*@unchecked Sendable'
+    message: "Put a comment that mentions `@unchecked` and says why on the line above."
+    severity: error
+  extension_modules_have_no_sdk:
+    name: "Extension-safe modules do not import the SDK"
+    included: 'Sources/DVPN(CoreKit|\w+Core|\w+Provider)/.*\.swift$'
+    regex: '\bimport\s+(DVPNSDK|DVPNTunnel)\b'
+    message: "Only DVPNTunnel (app-level) may import DVPNSDK; the extensions link the other modules (README.md, Products)."
+    severity: error
+  sdk_has_no_tunnel:
+    name: "The backend client knows no tunnel"
+    included: 'Sources/DVPNSDK/.*\.swift$'
+    regex: '\bimport\s+(NetworkExtension|WireGuardKit|DVPN(?!SDK\b)\w+)\b'
+    message: "DVPNSDK is the backend client: tunnel code belongs in the tunnel modules (README.md, Products)."
+    severity: error
+  no_ui:
+    name: "No UI"
+    regex: '\bimport\s+(SwiftUI|UIKit|AppKit)\b'
+    message: "The SDK has no UI; views belong in the app."
+    severity: error

@@ -1,0 +1,32 @@
+{
+  "auth" : "secret",
+  "bandwidth" : {
+    "downMbps" : 100,
+    "upMbps" : 20
+  },
+  "fastOpen" : true,
+  "lazy" : false,
+  "name" : "Test",
+  "obfs" : {
+    "password" : "salamander-pw",
+    "type" : "salamander"
+  },
+  "port" : 8443,
+  "quic" : {
+    "disablePathMTUDiscovery" : false,
+    "keepAlivePeriodSec" : 10,
+    "maxIdleTimeoutSec" : 30
+  },
+  "server" : "203.0.113.10",
+  "socks5" : {
+    "listen" : "[::1]:8080",
+    "password" : "local-pass",
+    "udp" : true,
+    "username" : "local-user"
+  },
+  "tls" : {
+    "insecure" : true,
+    "pinSHA256" : "AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89",
+    "sni" : "example.com"
+  }
+}

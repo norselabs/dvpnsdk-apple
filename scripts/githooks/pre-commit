@@ -1,0 +1,18 @@
+#!/bin/bash
+# Lints the staged Swift files; scripts/bootstrap.sh enables it (git config core.hooksPath).
+# Skip once with `git commit --no-verify`; fix formatting with `swiftformat <files>`.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+files=()
+while IFS= read -r -d '' file; do
+  [[ "$file" == */Generated/* ]] || files+=("$file")
+done < <(git diff --cached --name-only --diff-filter=ACMR -z -- '*.swift')
+[[ ${#files[@]} -eq 0 ]] && exit 0
+
+for tool in swiftformat swiftlint; do
+  command -v "$tool" >/dev/null || { echo "pre-commit: $tool is missing, run scripts/bootstrap.sh" >&2; exit 1; }
+done
+
+swiftformat --lint --quiet "${files[@]}" || { echo "pre-commit: run \`swiftformat ${files[*]}\`" >&2; exit 1; }
+swiftlint lint --strict --quiet --force-exclude "${files[@]}"
