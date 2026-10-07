@@ -228,7 +228,7 @@ extension TunnelManager {
     }
 
     /// The app's "Advanced obfuscation" setting, read at connect time so a toggle applies to the next connection.
-    private var selectedObfuscation: XObfuscation {
+    var selectedObfuscation: XObfuscation {
         storage.isObfuscationEnabled ? .tlsFragment(.init()) : .none
     }
 

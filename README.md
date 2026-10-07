@@ -50,7 +50,7 @@ of its own, and the app links no engine at all.
 | Product | Linked by | What it holds |
 |---|---|---|
 | `DVPNSDK` | the app | The backend client: `BackendConfiguration` and one dependency client per area (`NodeCatalogClient`, `ConnectionAPIClient`, `DeviceAPIClient`, `ConfigAPIClient`, `APIEndpointClient`, `DeviceEventsClient`); the mirrors that stand in for the API when it cannot be reached; typed `APIError`s. |
-| `DVPNTunnel` | the app | `TunnelManager`: `start(from:)` connects to the node in a set of credentials, `stop()`, `isActive()`, `events()`. On macOS also `SplitTunnelManager`. |
+| `DVPNTunnel` | the app | `TunnelManager`: `start(from:)` connects to the node in a set of credentials, `restart()`, `stop()`, `isActive()`, `events()`. On macOS also `SplitTunnelManager`. |
 | `DVPNCoreKit` | the app and every extension | `DVPNCoreConfiguration`, the App Group paths, DNS settings. |
 | `DVPNWireGuardProvider`, `DVPNXRayProvider`, `DVPNHysteriaProvider` | one extension each | The `NEPacketTunnelProvider` base classes. |
 | `DVPNSplitTunnelProvider` | a macOS extension | `SplitTunnelProxyProvider`, a transparent proxy that lets chosen apps bypass the VPN. |
@@ -169,6 +169,10 @@ try await tunnels.start(from: credentials)
 > `.amneziawg`, the Hysteria extension `.hysteria`.
 
 `settings` supplies the DNS servers and whether Xray fragments its TLS ClientHello.
+`TunnelManager` reads both when a tunnel starts. To apply a change to either, call `restart()`: it starts the tunnel
+again on the same node from the configuration the last start stored, with no new credentials. It throws
+`TunnelsServiceError.noStoredConfiguration`, leaving the tunnel as it is, when nothing is stored (tvOS may purge it);
+start from new credentials then.
 
 ### 5. Split tunnelling (macOS)
 

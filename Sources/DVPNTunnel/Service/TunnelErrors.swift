@@ -18,6 +18,8 @@ public enum TunnelsServiceError: LocalizedError, Sendable {
 
     case emptyCredentials
     case unsupportedProtocol
+    /// `TunnelManager.restart()` found nothing stored to start the tunnel from.
+    case noStoredConfiguration
 
     case activationFailed(TunnelActivationError)
 }
@@ -56,6 +58,8 @@ public extension TunnelsServiceError {
             return "Failed to parse connection data"
         case .unsupportedProtocol:
             return "Unsupported protocol"
+        case .noStoredConfiguration:
+            return "No stored configuration to restart the tunnel from"
         case let .activationFailed(error):
             return error.errorDescription
         }
