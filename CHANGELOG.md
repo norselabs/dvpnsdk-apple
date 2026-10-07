@@ -11,6 +11,12 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   as they are now, without new credentials. With nothing stored to start from, it throws the new
   `TunnelsServiceError.noStoredConfiguration` and leaves the tunnel as it is.
 
+### Fixed
+
+- Xray and V2Ray connections go to the address the device looked up through its own DNS. The client used to hand the
+  node each sniffed site name, so the node looked it up again with its own resolver and used that answer instead;
+  sniffing now only chooses routes (`routeOnly`).
+
 ## 0.1.0
 
 The first release: the DVPN SDK API client and the WireGuard/AmneziaWG, Xray and Hysteria 2 tunnels in one package,

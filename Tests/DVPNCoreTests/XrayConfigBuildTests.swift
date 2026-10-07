@@ -57,6 +57,19 @@ struct XrayConfigBuildTests {
         #expect(json["routing"] != nil)
     }
 
+    /// A sniffed name only chooses a route: the node connects to the address the device looked up through its chosen
+    /// DNS, instead of looking the name up again with its own resolver.
+    @Test
+    func sniffedNamesOnlyChooseARoute() throws {
+        let data = try XrayDocumentBuilder.build(proxyOutbound: ["protocol": "freedom"], localProxy: .fixture)
+        let json = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let inbounds = try #require(json["inbounds"] as? [[String: Any]])
+        let sniffing = try #require(inbounds.first?["sniffing"] as? [String: Any])
+
+        #expect(sniffing["enabled"] as? Bool == true)
+        #expect(sniffing["routeOnly"] as? Bool == true)
+    }
+
     /// The complete document for a production-shaped XRAY node (VLESS + REALITY + Vision over RAW wins
     /// over four others), pinned as a fixture: a change to the selection or the builders shows up as a
     /// diff. Record a new fixture with `DVPN_RECORD_FIXTURES=1 scripts/test.sh --filter xrayNodeDocument`.
