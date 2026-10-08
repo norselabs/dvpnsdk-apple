@@ -52,7 +52,7 @@ public enum XraySourceStore {
         let data = try JSONEncoder().encode(source)
         // Atomic and throwing: a failed write must fail the start, not leave the previous node's config to run.
         try data.write(to: destinationURL, options: .atomic)
-        logger.info("Xray source saved to file: \(destinationURL.path(percentEncoded: false), privacy: .public)")
+        logger.info("Xray source saved")
     }
 
     public static func loadCurrent() throws(XraySourceError) -> XraySource {

@@ -216,16 +216,16 @@ private extension MirroredTransport {
     func sendViaMirror(_ request: APIRequest, headers: [String: String], retryOnFailure: Bool) async throws -> APIResponse {
         let path = request.target.path
         let resolved = try await resolver.currentMirror()
-        log.info("sendViaMirror [\(path, privacy: .public)] using \(Self.describe(resolved), privacy: .public)")
+        log.info("sendViaMirror [\(path, privacy: .public)] mirror used")
         do {
             switch resolved {
             case let .regular(host):
                 let response = try await sendRegular(request, host: host, headers: headers)
-                log.info("sendViaMirror [\(path, privacy: .public)] REGULAR \(host, privacy: .public) answered \(response.status)")
+                log.info("sendViaMirror [\(path, privacy: .public)] mirror answered \(response.status)")
                 return response
             case let .sniSpoof(ip, sni):
                 let response = try await sendSpoofed(request, ip: ip, sni: sni, headers: headers)
-                log.info("sendViaMirror [\(path, privacy: .public)] SNI_SPOOF ip=\(ip, privacy: .public) sni=\(sni, privacy: .public) answered \(response.status)")
+                log.info("sendViaMirror [\(path, privacy: .public)] mirror answered \(response.status)")
                 return response
             }
         } catch {
@@ -356,10 +356,6 @@ extension MirroredTransport {
         case let .invalidResponse(status):
             return "\(status) invalid response"
         }
-    }
-
-    static func describe(_ resolved: MirrorResolver.Resolved) -> String {
-        MirrorResolver.describe(resolved)
     }
 
     /// `request` sent to `host` instead of `apiURL`'s host: the API's scheme, port and path, and the request's path

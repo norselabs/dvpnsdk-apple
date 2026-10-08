@@ -43,7 +43,7 @@ public enum HysteriaConfigurationStore {
         let data = try JSONEncoder().encode(configuration)
         // Atomic and throwing: a failed write must fail the start, not leave the previous node's config to run.
         try data.write(to: destinationURL, options: .atomic)
-        logger.info("Hysteria config saved to file: \(destinationURL.path(percentEncoded: false), privacy: .public)")
+        logger.info("Hysteria config saved")
     }
 
     public static func loadCurrent() throws -> HysteriaConfiguration {

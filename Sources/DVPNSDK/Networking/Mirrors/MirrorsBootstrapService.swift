@@ -24,18 +24,19 @@ struct MirrorsBootstrapService: Sendable {
         defer { session.finishTasksAndInvalidate() }
 
         return try await withThrowingTaskGroup(of: [Mirror]?.self) { group in
-            for url in urls {
+            for (index, url) in urls.enumerated() {
+                let name = "\(index + 1) of \(urls.count)"
                 group.addTask {
                     do {
                         let mirrors = try await Self.mirrors(from: url, on: session)
                         if mirrors.isEmpty {
-                            log.debug("bootstrap \(url.absoluteString, privacy: .public) returned empty list")
+                            log.debug("bootstrap \(name, privacy: .public) returned empty list")
                             return nil
                         }
-                        log.debug("bootstrap \(url.absoluteString, privacy: .public) returned \(mirrors.count) mirror(s)")
+                        log.debug("bootstrap \(name, privacy: .public) returned \(mirrors.count) mirror(s)")
                         return mirrors
                     } catch {
-                        log.debug("bootstrap \(url.absoluteString, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+                        log.debug("bootstrap \(name, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
                         return nil
                     }
                 }

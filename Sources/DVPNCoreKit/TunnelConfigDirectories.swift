@@ -39,7 +39,7 @@ public enum TunnelConfigDirectories {
             return try TunnelConfigDirectories.createDirectory(at: url)
         } catch {
             logger.error(
-                "Unable to create the tunnel config directory \(url.path, privacy: .public): \(error.localizedDescription, privacy: .public)"
+                "Unable to create the tunnel config directory: \(error.localizedDescription, privacy: .public)"
             )
             return nil
         }

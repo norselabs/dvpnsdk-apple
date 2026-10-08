@@ -160,7 +160,7 @@ private extension MirrorResolver {
             log.error("resolveFromBootstrap exhausted — no healthy mirror")
             throw MirrorError.noHealthyMirror
         }
-        log.debug("resolveFromBootstrap found \(Self.describe(found), privacy: .public)")
+        log.debug("resolveFromBootstrap found a mirror")
         cached = found
         return found
     }
@@ -219,7 +219,7 @@ private extension MirrorResolver {
             guard !Task.isCancelled else { break }
             if await probe(route) { return .probed(found: route, failed: failures) }
             guard !Task.isCancelled else { break }
-            log.debug("probe failed: \(describe(route), privacy: .auto)")
+            log.debug("probe failed")
             failures.append(route)
         }
         return .probed(found: nil, failed: failures)
@@ -260,15 +260,6 @@ extension MirrorResolver {
             } catch {
                 return false
             }
-        }
-    }
-
-    static func describe(_ route: Resolved) -> String {
-        switch route {
-        case let .regular(host):
-            return "REGULAR(\(host))"
-        case let .sniSpoof(ip, sni):
-            return "SNI_SPOOF(ip=\(ip), sni=\(sni))"
         }
     }
 }

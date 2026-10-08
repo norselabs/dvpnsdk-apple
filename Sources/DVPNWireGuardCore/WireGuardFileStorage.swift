@@ -56,7 +56,7 @@ final class WireGuardFileStorage {
         // Atomic and throwing: a failed write must fail the start, not leave the previous node's config to run.
         try data.write(to: destinationURL, options: .atomic)
 
-        logger.info("WireGuard config saved to file: \(destinationURL.path(percentEncoded: false), privacy: .public)")
+        logger.info("WireGuard config saved")
     }
 
     static func load() throws -> TunnelConfiguration? {
@@ -70,14 +70,14 @@ final class WireGuardFileStorage {
         let configURL = folderURL.appending(component: "config.json")
 
         guard FileManager.default.fileExists(atPath: configURL.path(percentEncoded: false)) else {
-            logger.info("WireGuard config file does not exist at: \(configURL.path(percentEncoded: false), privacy: .public)")
+            logger.info("No WireGuard config file")
             return nil
         }
 
         let data = try Data(contentsOf: configURL)
         let config = try JSONDecoder().decode(WireGuardFileConfiguration.self, from: data)
 
-        logger.info("WireGuard config loaded from file: \(configURL.path(percentEncoded: false), privacy: .public)")
+        logger.info("WireGuard config loaded")
         return try config.toTunnelConfiguration()
     }
 
@@ -91,7 +91,7 @@ final class WireGuardFileStorage {
 
         if FileManager.default.fileExists(atPath: folderURL.path(percentEncoded: false)) {
             try FileManager.default.removeItem(at: folderURL)
-            logger.info("WireGuard config deleted from: \(folderURL.path(percentEncoded: false), privacy: .public)")
+            logger.info("WireGuard config deleted")
         }
     }
 
