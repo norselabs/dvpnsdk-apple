@@ -13,6 +13,9 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ### Fixed
 
+- A request now ends within its own timeout across the primary and the mirrors. A primary that answered with a server
+  error and a mirror that did not answer used to add up to minutes for one request, as each mirror attempt waited the
+  full timeout. At the deadline the request ends with the primary's answer, or with a timeout.
 - Xray and V2Ray connections go to the address the device looked up through its own DNS. The client used to hand the
   node each sniffed site name, so the node looked it up again with its own resolver and used that answer instead;
   sniffing now only chooses routes (`routeOnly`).

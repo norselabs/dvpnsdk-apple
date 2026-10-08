@@ -137,6 +137,36 @@ struct HTTPClientExecuteTests {
 
     // MARK: Cancellation
 
+    /// The primary, the mirror resolution and the mirror attempts share the request's timeout: a primary that answers
+    /// 500 and a mirror that never answers end the request at its deadline, not one full timeout per attempt later,
+    /// with the primary's answer, which says more than the mirror's silence.
+    @Test
+    func aSilentMirrorEndsTheRequestAtItsDeadlineWithThePrimaryAnswer() async {
+        // The primary takes most of the request's second; the mirror's own wait used to start only then.
+        StubProtocol.answers = ["primary.test": .after(0.8, .status(500)), "mirror.test": .hang]
+        let (client, _) = await makeClient(mirror: .regular(host: "mirror.test"))
+        let request = APIRequest(target: Target(), timeoutInterval: 1)
+        let start = ContinuousClock.now
+
+        await #expect(throws: APIError.backend(status: 500, code: nil)) { try await client.execute(request, as: Answer.self) }
+
+        #expect(ContinuousClock.now - start < .milliseconds(1_400))
+        #expect(StubProtocol.requestedHosts == ["primary.test", "mirror.test"])
+    }
+
+    /// With no answer from the primary either, the deadline ends the request as a timeout.
+    @Test
+    func aSilentMirrorAfterASilentPrimaryEndsAsATimeout() async {
+        StubProtocol.answers = ["primary.test": .after(0.8, .failure(URLError(.timedOut))), "mirror.test": .hang]
+        let (client, _) = await makeClient(mirror: .regular(host: "mirror.test"))
+        let request = APIRequest(target: Target(), timeoutInterval: 1)
+        let start = ContinuousClock.now
+
+        await #expect(throws: APIError.unreachable(.timedOut)) { try await client.execute(request, as: Answer.self) }
+
+        #expect(ContinuousClock.now - start < .milliseconds(1_400))
+    }
+
     /// A request whose caller gave up (the app's limit on its IP lookup) is cancelled with it and fails with
     /// `CancellationError`: no fallback to the mirror, and no preference for it afterwards.
     @Test
@@ -286,13 +316,15 @@ private func firstEvent(of events: AsyncStream<DeviceEvent>, within limit: Durat
 /// Answers every request from `answers`, keyed by host, and records the hosts asked.
 /// `@unchecked` because URLProtocol is not Sendable; the serialized suite is the only writer.
 private final class StubProtocol: URLProtocol, @unchecked Sendable {
-    enum Answer {
+    indirect enum Answer: Sendable {
         case json(String)
         /// A status with `body`, such as the backend's `{"error": …}`.
         case status(Int, body: String = "{}")
         case failure(URLError)
         /// No answer at all, until the request is cancelled.
         case hang
+        /// `answer`, `seconds` after the request was sent.
+        case after(TimeInterval, Answer)
     }
 
     nonisolated(unsafe) static var answers: [String: Answer] = [:] {
@@ -311,7 +343,16 @@ private final class StubProtocol: URLProtocol, @unchecked Sendable {
             client?.urlProtocol(self, didFailWithError: URLError(.cannotFindHost))
             return
         }
+        deliver(answer, for: url)
+    }
+
+    private func deliver(_ answer: Answer, for url: URL) {
         switch answer {
+        case let .after(seconds, answer):
+            Task {
+                try? await Task.sleep(for: .seconds(seconds))
+                self.deliver(answer, for: url)
+            }
         case .hang:
             break
         case let .failure(error):

@@ -5,6 +5,7 @@
 
 import Foundation
 import OSLog
+import Synchronization
 
 private let log = Logger(subsystem: "com.dvpnsdk", category: "http")
 
@@ -12,7 +13,7 @@ private let log = Logger(subsystem: "com.dvpnsdk", category: "http")
 
 /// The backend's transport: the primary first, then its mirrors. A request whose primary attempt fails hard (no answer,
 /// a TLS failure, 408 or 5xx) is retried on a mirror, and later requests go to that mirror until `refreshEndpoint`
-/// finds the primary again.
+/// finds the primary again. The primary, the mirror resolution and the mirror attempts share the request's timeout.
 public final class MirroredTransport: APITransport, Sendable {
     private let session: URLSession
     /// Configures the throwaway session of a request whose answer depends on the network path (`/ip`).
@@ -62,7 +63,9 @@ public final class MirroredTransport: APITransport, Sendable {
 
     public func send(_ request: APIRequest, headers: [String: String]) async throws -> APIResponse {
         do {
-            return try await route(request, headers: headers)
+            return try await withinDeadline(of: request) { primaryFailure in
+                try await self.route(request, headers: headers, primaryFailure: primaryFailure)
+            }
         } catch let failure as HardFailure {
             // No other endpoint did better: the hard failure's answer, or its error, is the request's.
             switch failure {
@@ -101,7 +104,7 @@ public final class MirroredTransport: APITransport, Sendable {
 // MARK: - Routing
 
 private extension MirroredTransport {
-    func route(_ request: APIRequest, headers: [String: String]) async throws -> APIResponse {
+    func route(_ request: APIRequest, headers: [String: String], primaryFailure: PrimaryFailure) async throws -> APIResponse {
         let path = request.target.path
         log.debug("send [\(path, privacy: .public)] start")
 
@@ -129,7 +132,8 @@ private extension MirroredTransport {
             log.debug("send [\(path, privacy: .public)] primary answered \(response.status)")
             return response
         } catch let failure as HardFailure {
-            log.debug("send [\(path, privacy: .public)] primary hard-failed (\(Self.describeFailure(failure), privacy: .public)) — falling back to mirror")
+            primaryFailure.set(failure)
+            log.info("send [\(path, privacy: .public)] primary hard-failed (\(Self.describeFailure(failure), privacy: .public)) — falling back to mirror")
             let response: APIResponse
             do {
                 response = try await sendViaMirror(request, headers: headers, retryOnFailure: true)
@@ -145,6 +149,47 @@ private extension MirroredTransport {
             log.error("send [\(path, privacy: .public)] primary failed non-recoverably: \(Self.describeFailure(error), privacy: .public)")
             throw error
         }
+    }
+}
+
+// MARK: - Deadline
+
+private extension MirroredTransport {
+    /// Runs `operation`, a request's whole route, within the request's timeout. A `URLRequest`'s timeout only bounds the
+    /// wait for the next bytes, and each mirror attempt had it in full, so a failing primary and a silent mirror added
+    /// up to minutes. At the deadline the route is cancelled, and the request ends with the primary's failure when it
+    /// had one (it says more than the mirror's silence), otherwise with a timeout.
+    func withinDeadline(
+        of request: APIRequest,
+        _ operation: @escaping @Sendable (PrimaryFailure) async throws -> APIResponse
+    ) async throws -> APIResponse {
+        let primaryFailure = PrimaryFailure()
+        let limit = request.timeoutInterval
+        let path = request.target.path
+        return try await withThrowingTaskGroup(of: APIResponse?.self) { group in
+            group.addTask { try await operation(primaryFailure) }
+            group.addTask {
+                try await Task.sleep(for: .seconds(limit))
+                return nil
+            }
+            defer { group.cancelAll() }
+            if let response = try await group.next() ?? nil { return response }
+            log.error("send [\(path, privacy: .public)] no answer within \(limit) s — giving up")
+            throw primaryFailure.value ?? HardFailure.error(.unreachable(.timedOut))
+        }
+    }
+}
+
+/// The primary's hard failure, kept for the deadline: the request ends with it if no mirror answers in time.
+final class PrimaryFailure: Sendable {
+    private let failure = Mutex<HardFailure?>(nil)
+
+    var value: HardFailure? {
+        failure.withLock { $0 }
+    }
+
+    func set(_ value: HardFailure) {
+        failure.withLock { $0 = value }
     }
 }
 
@@ -171,21 +216,21 @@ private extension MirroredTransport {
     func sendViaMirror(_ request: APIRequest, headers: [String: String], retryOnFailure: Bool) async throws -> APIResponse {
         let path = request.target.path
         let resolved = try await resolver.currentMirror()
-        log.debug("sendViaMirror [\(path, privacy: .public)] using \(Self.describe(resolved), privacy: .public)")
+        log.info("sendViaMirror [\(path, privacy: .public)] using \(Self.describe(resolved), privacy: .public)")
         do {
             switch resolved {
             case let .regular(host):
                 let response = try await sendRegular(request, host: host, headers: headers)
-                log.debug("sendViaMirror [\(path, privacy: .public)] REGULAR \(host, privacy: .public) answered \(response.status)")
+                log.info("sendViaMirror [\(path, privacy: .public)] REGULAR \(host, privacy: .public) answered \(response.status)")
                 return response
             case let .sniSpoof(ip, sni):
                 let response = try await sendSpoofed(request, ip: ip, sni: sni, headers: headers)
-                log.debug("sendViaMirror [\(path, privacy: .public)] SNI_SPOOF ip=\(ip, privacy: .public) sni=\(sni, privacy: .public) answered \(response.status)")
+                log.info("sendViaMirror [\(path, privacy: .public)] SNI_SPOOF ip=\(ip, privacy: .public) sni=\(sni, privacy: .public) answered \(response.status)")
                 return response
             }
         } catch {
             if retryOnFailure, Self.isHardFailure(error) {
-                log.debug("sendViaMirror [\(path, privacy: .public)] mirror hard-failed (\(Self.describeFailure(error), privacy: .public)) — invalidating and re-resolving")
+                log.info("sendViaMirror [\(path, privacy: .public)] mirror hard-failed (\(Self.describeFailure(error), privacy: .public)) — invalidating and re-resolving")
                 await resolver.invalidate(resolved)
                 return try await sendViaMirror(request, headers: headers, retryOnFailure: false)
             }
