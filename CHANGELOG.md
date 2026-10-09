@@ -13,6 +13,8 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ### Fixed
 
+- A request is tried when the network path requires a connection, such as an on-demand VPN coming up, instead of
+  failing at once as offline.
 - macOS: with split tunnelling on, Hysteria 2 connects. The split-tunnel proxy was offered the tunnel's own UDP flow to
   its node and declined it, which broke the socket. The tunnels now record their node, and the proxy leaves its
   addresses out of its rules.

@@ -37,13 +37,22 @@ struct NetworkReachabilityTests {
         #expect(await reachability.isReachable)
     }
 
-    /// A path that needs a connection to be attached is not reachable yet, as before.
-    @Test(arguments: [NWPath.Status.unsatisfied, .requiresConnection])
-    func aPathThatIsNotSatisfiedIsNotReachable(status: NWPath.Status) async {
+    @Test
+    func anUnsatisfiedPathIsNotReachable() async {
         let (reachability, reports) = makeReachability()
-        reports.yield(status)
+        reports.yield(.unsatisfied)
 
         #expect(await !reachability.isReachable)
+    }
+
+    /// A path that requires a connection comes up with the attempt (an on-demand VPN starting, a radio waking): the
+    /// request is tried, not failed at once as offline.
+    @Test
+    func aPathThatRequiresAConnectionIsTried() async {
+        let (reachability, reports) = makeReachability()
+        reports.yield(.requiresConnection)
+
+        #expect(await reachability.isReachable)
     }
 
     /// A monitor that never reports is not the network's fault: the request goes through and fails on its own, and

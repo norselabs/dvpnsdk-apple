@@ -41,13 +41,14 @@ actor NetworkReachability {
         consumer?.cancel()
     }
 
-    /// Whether a request should be tried. A known status decides: only a satisfied path is reachable. An unknown one
-    /// waits for the first report and, if none comes within the bound, lets the request through: its own failure
-    /// says whether the network is there.
+    /// Whether a request should be tried. A known status decides: only an unsatisfied path is unreachable. A path that
+    /// requires a connection (an on-demand VPN coming up, a radio waking) is brought up by the attempt itself, so the
+    /// request is tried rather than failed at once as offline. An unknown status waits for the first report and, if
+    /// none comes within the bound, lets the request through: its own failure says whether the network is there.
     var isReachable: Bool {
         get async {
             await waitForFirstStatus()
-            return status.map { $0 == .satisfied } ?? true
+            return status.map { $0 != .unsatisfied } ?? true
         }
     }
 
