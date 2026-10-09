@@ -40,9 +40,16 @@ public struct SplitTunnelSettings: Codable, Equatable, Sendable {
         case .disabled:
             return false
         case .exceptSelected:
-            return apps.contains(signingIdentifier)
+            return isSelected(signingIdentifier)
         case .allowSelected:
-            return !apps.contains(signingIdentifier)
+            return !isSelected(signingIdentifier)
         }
+    }
+
+    /// A selected app, or one of its helpers: a process whose identifier extends a selected app's with a dot (an app's
+    /// network often runs in a helper, such as `com.example.app.helper`).
+    func isSelected(_ signingIdentifier: String) -> Bool {
+        guard !signingIdentifier.isEmpty else { return false }
+        return apps.contains(signingIdentifier) || apps.contains { signingIdentifier.hasPrefix($0 + ".") }
     }
 }

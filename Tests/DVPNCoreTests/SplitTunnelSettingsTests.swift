@@ -48,6 +48,20 @@ struct SplitTunnelSettingsTests {
         #expect(settings.bypassesVPN(""), "a system process is not a selected app")
     }
 
+    /// An app's helper processes follow the app: their identifiers extend the app's with a dot. An identifier that
+    /// only starts with the same letters is another app.
+    @Test
+    func anAppsHelpersFollowTheApp() {
+        let except = SplitTunnelSettings(mode: .exceptSelected, apps: ["com.example.app"])
+        #expect(except.bypassesVPN("com.example.app.helper"))
+        #expect(except.bypassesVPN("com.example.app.Helper.Renderer"))
+        #expect(!except.bypassesVPN("com.example.application"))
+
+        let allow = SplitTunnelSettings(mode: .allowSelected, apps: ["com.example.app"])
+        #expect(!allow.bypassesVPN("com.example.app.helper"))
+        #expect(allow.bypassesVPN("com.example.application"))
+    }
+
     @Test
     func savedSettingsAreReadBack() throws {
         defer { defaults.removePersistentDomain(forName: suiteName) }

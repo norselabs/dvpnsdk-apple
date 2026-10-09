@@ -13,6 +13,8 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ### Fixed
 
+- macOS split tunnelling: an app's helper processes follow the app. A flow whose signing identifier extends a selected
+  app's with a dot (`com.example.app.helper`) counts as that app's.
 - A request is tried when the network path requires a connection, such as an on-demand VPN coming up, instead of
   failing at once as offline.
 - macOS: with split tunnelling on, Hysteria 2 connects. The split-tunnel proxy was offered the tunnel's own UDP flow to
