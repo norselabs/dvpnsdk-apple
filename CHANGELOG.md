@@ -13,6 +13,9 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ### Fixed
 
+- macOS: with split tunnelling on, Hysteria 2 connects. The split-tunnel proxy was offered the tunnel's own UDP flow to
+  its node and declined it, which broke the socket. The tunnels now record their node, and the proxy leaves its
+  addresses out of its rules.
 - A request now ends within its own timeout across the primary and the mirrors. A primary that answered with a server
   error and a mirror that did not answer used to add up to minutes for one request, as each mirror attempt waited the
   full timeout. At the deadline the request ends with the primary's answer, or with a timeout.

@@ -33,6 +33,11 @@ open class ProxyPacketTunnelProvider: NEPacketTunnelProvider {
     /// Stop the proxy engine started by `startProxy(network:proxy:)`.
     open func stopProxy() {}
 
+    /// The node this start connects to, which the split-tunnel proxy leaves out; nil when unknown.
+    open var nodeHost: String? {
+        nil
+    }
+
     open func makeNetworkSettings(network: NetworkModel) -> NEPacketTunnelNetworkSettings {
         let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "254.1.1.1")
         settings.mtu = NSNumber(value: mtu)
@@ -64,7 +69,7 @@ open class ProxyPacketTunnelProvider: NEPacketTunnelProvider {
         let network = NetworkModel.current
 #if os(macOS)
         // Before the tunnel's interface appears, so the split-tunnel proxy sees both together.
-        TunnelStateStore.record(isUp: true)
+        TunnelStateStore.record(isUp: true, server: nodeHost)
 #endif
 
         do {

@@ -48,8 +48,9 @@ open class WireGuardPacketTunnelProvider: NEPacketTunnelProvider {
         }
 
 #if os(macOS)
-        // Before the tunnel's interface appears, so the split-tunnel proxy sees both together.
-        TunnelStateStore.record(isUp: true)
+        // Before the tunnel's interface appears, so the split-tunnel proxy sees both together; the node it connects to
+        // is left out of the proxy.
+        TunnelStateStore.record(isUp: true, server: tunnelConfiguration.peers.first?.endpoint.map { "\($0.host)" })
 #endif
         do {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in

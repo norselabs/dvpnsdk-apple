@@ -32,6 +32,14 @@ struct SplitTunnelTrafficTests {
         #expect(SplitTunnelTraffic.excluded.filter { $0.address == "0.0.0.0" || $0.address == "::" }.allSatisfy { $0.port != nil })
     }
 
+    /// The tunnel's own traffic to its node never reaches the proxy, whatever its port and protocol.
+    @Test
+    func theNodeIsLeftOut() {
+        let excluded = SplitTunnelTraffic.excluded(node: ["203.0.113.7", "2001:db8::7", "node.example", ""])
+        #expect(excluded.map { "\($0.address)/\($0.prefix)" } == ["203.0.113.7/32", "2001:db8::7/128"])
+        #expect(excluded.allSatisfy { $0.port == nil && !$0.isUDPOnly })
+    }
+
     @Test
     func aMessageRoundTrips() {
         #expect(SplitTunnelMessage(data: SplitTunnelMessage.reloadSettings.data) == .reloadSettings)

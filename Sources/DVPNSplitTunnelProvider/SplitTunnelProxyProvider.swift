@@ -42,6 +42,8 @@ open class SplitTunnelProxyProvider: NETransparentProxyProvider, @unchecked Send
     /// Whether DVPN's tunnel is up: its provider says so (`TunnelStateStore`) and a tunnel interface is there, which a
     /// stale "up" after the tunnel crashed has not. Flows are offered only then.
     private let isTunnelUp = OSAllocatedUnfairLock(initialState: false)
+    /// The node the rules leave out, as the tunnel last said.
+    private let offeredNode = OSAllocatedUnfairLock<String?>(initialState: nil)
     /// The rules to set, in order, for the one consumer that sets them.
     private let ruleChanges: AsyncStream<Bool>
     private let ruleChangesContinuation: AsyncStream<Bool>.Continuation
@@ -138,15 +140,21 @@ private extension SplitTunnelProxyProvider {
         monitor.currentPath.availableInterfaces.first { $0.type != .other && $0.type != .loopback }
     }
 
-    /// Re-reads whether DVPN's tunnel is up, on a path change or the tunnel's notification, and has the rules follow.
+    /// Re-reads whether DVPN's tunnel is up and which node it uses, on a path change or the tunnel's notification, and
+    /// has the rules follow.
     func follow(_ path: NWPath) {
         guard !isStopped.withLock({ $0 }) else { return }
         let isUp = TunnelStateStore.isUp() && path.availableInterfaces.contains { $0.type == .other }
+        let node = isUp ? TunnelStateStore.server() : nil
         let changed = isTunnelUp.withLock { current in
             defer { current = isUp }
             return current != isUp
         }
-        guard changed else { return }
+        let nodeChanged = offeredNode.withLock { current in
+            defer { current = node }
+            return current != node
+        }
+        guard changed || (isUp && nodeChanged) else { return }
         logger.info("Split tunnel: DVPN's tunnel is \(isUp ? "up, flows are offered" : "down, no flow is offered", privacy: .public)")
         ruleChangesContinuation.yield(isUp)
     }
@@ -156,13 +164,37 @@ private extension SplitTunnelProxyProvider {
     func setRules(offering: Bool) async throws {
         let network = NETransparentProxyNetworkSettings(tunnelRemoteAddress: "127.0.0.1")
         network.includedNetworkRules = offering ? SplitTunnelTraffic.offered.map(Self.rule) : []
-        network.excludedNetworkRules = SplitTunnelTraffic.excluded.map(Self.rule)
+        // The tunnel's own traffic to its node is never offered: declined, a UDP flow breaks (Hysteria's QUIC).
+        let node = offering ? offeredNode.withLock { $0 } : nil
+        let nodeRules = SplitTunnelTraffic.excluded(node: node.map(Self.addresses(of:)) ?? [])
+        if let node { logger.info("Split tunnel: the tunnel's node \(node, privacy: .public) is left out (\(nodeRules.count) address(es))") }
+        network.excludedNetworkRules = (SplitTunnelTraffic.excluded + nodeRules).map(Self.rule)
         do {
             try await setTunnelNetworkSettings(network)
         } catch where !offering {
             logger.error("Split tunnel: no rules were refused (\(error.localizedDescription, privacy: .public)); offering every flow")
             try await setRules(offering: true)
         }
+    }
+
+    /// `host`'s addresses: itself when it is one, else what the system resolves it to.
+    static func addresses(of host: String) -> [String] {
+        if IPv4Address(host) != nil || IPv6Address(host) != nil { return [host] }
+        var hints = addrinfo(ai_flags: 0, ai_family: AF_UNSPEC, ai_socktype: SOCK_STREAM, ai_protocol: 0, ai_addrlen: 0,
+                             ai_canonname: nil, ai_addr: nil, ai_next: nil)
+        var result: UnsafeMutablePointer<addrinfo>?
+        guard getaddrinfo(host, nil, &hints, &result) == 0, let first = result else { return [] }
+        defer { freeaddrinfo(first) }
+        var addresses: [String] = []
+        for info in sequence(first: first, next: { $0.pointee.ai_next }) {
+            var buffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+            if getnameinfo(info.pointee.ai_addr, info.pointee.ai_addrlen, &buffer, socklen_t(buffer.count), nil, 0,
+                           NI_NUMERICHOST) == 0
+            {
+                addresses.append(String(decoding: buffer.prefix { $0 != 0 }.map(UInt8.init(bitPattern:)), as: UTF8.self))
+            }
+        }
+        return Array(Set(addresses))
     }
 
     static func rule(for destination: SplitTunnelTraffic.Destination) -> NENetworkRule {

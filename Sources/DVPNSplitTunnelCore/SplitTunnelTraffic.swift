@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import Network
 
 // MARK: - SplitTunnelTraffic
 
@@ -54,6 +55,17 @@ public enum SplitTunnelTraffic {
         Destination("ff00::", 8),
         Destination("::1", 128),
     ]
+
+    /// Left out while the tunnel is up: the tunnel's own traffic to its node. Offered to the proxy, a flow from the
+    /// tunnel's extension is declined, and declining a UDP flow breaks its socket: Hysteria's QUIC could not connect.
+    /// `addresses` are the node's addresses, IPv4 or IPv6; anything else is skipped.
+    public static func excluded(node addresses: [String]) -> [Destination] {
+        addresses.compactMap { address in
+            if IPv4Address(address) != nil { return Destination(address, 32) }
+            if IPv6Address(address) != nil { return Destination(address, 128) }
+            return nil
+        }
+    }
 }
 
 // MARK: - SplitTunnelMessage

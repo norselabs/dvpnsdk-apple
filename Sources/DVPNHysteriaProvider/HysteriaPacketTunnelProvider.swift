@@ -22,6 +22,10 @@ open class HysteriaPacketTunnelProvider: ProxyPacketTunnelProvider {
         super.init()
     }
 
+    override open var nodeHost: String? {
+        try? HysteriaConfigurationStore.loadCurrent().server
+    }
+
     override open nonisolated(nonsending) func startProxy(network: NetworkModel, proxy: LocalProxy) async throws {
         var configuration = try HysteriaConfigurationStore.loadCurrent()
         configuration.socks5 = .local(proxy)

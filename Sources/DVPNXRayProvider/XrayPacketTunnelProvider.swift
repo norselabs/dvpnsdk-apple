@@ -25,6 +25,11 @@ open class XrayPacketTunnelProvider: ProxyPacketTunnelProvider {
         super.init()
     }
 
+    override open var nodeHost: String? {
+        guard case let .model(model) = try? XraySourceStore.loadCurrent() else { return nil }
+        return model.outbound.address
+    }
+
     override open nonisolated(nonsending) func startProxy(network: NetworkModel, proxy: LocalProxy) async throws {
         do {
             let resolved: XConfigurationModel = switch try XraySourceStore.loadCurrent() {
