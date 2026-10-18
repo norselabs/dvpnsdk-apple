@@ -45,8 +45,12 @@ public protocol TunnelSettingsProviding: AnyObject, Sendable {
     /// see `XObfuscation`). No effect on the other engines: AmneziaWG is obfuscated by design and a
     /// Hysteria 2 node dictates its own Salamander obfuscation.
     var isObfuscationEnabled: Bool { get }
+    /// How the profile routes the device's traffic, for every engine: the kill switch, local networks, enforced routes
+    /// (`TunnelNetworkOptions`). Read when the profile is saved; a running tunnel applies a change after `restart()`.
+    var networkOptions: TunnelNetworkOptions { get }
 }
 
 public extension TunnelSettingsProviding {
     var isObfuscationEnabled: Bool { false }
+    var networkOptions: TunnelNetworkOptions { .default }
 }

@@ -169,11 +169,14 @@ extension TunnelManager {
             try await service.modify(
                 tunnel: existing,
                 isOnDemandEnabled: true,
-                tunnelConfiguration: tunnelConfiguration
+                tunnelConfiguration: tunnelConfiguration,
+                networkOptions: storage.networkOptions
             )
             tunnel = existing
         } else {
-            tunnel = try await service.add(tunnelConfiguration: tunnelConfiguration, onDemandEnabled: true)
+            tunnel = try await service.add(
+                tunnelConfiguration: tunnelConfiguration, onDemandEnabled: true, networkOptions: storage.networkOptions
+            )
         }
 
         try await activate(tunnel, in: service)
@@ -250,7 +253,7 @@ extension TunnelManager {
             logger.error("Failed to store Xray configuration: \(error, privacy: .public)")
             throw .addTunnelFailed(systemError: error)
         }
-        let tunnel = try await service.startProxyTunnel(descriptor, onDemandEnabled: true)
+        let tunnel = try await service.startProxyTunnel(descriptor, onDemandEnabled: true, networkOptions: storage.networkOptions)
         try await activate(tunnel, in: service)
     }
 }

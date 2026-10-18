@@ -174,6 +174,28 @@ again on the same node from the configuration the last start stored, with no new
 `TunnelsServiceError.noStoredConfiguration`, leaving the tunnel as it is, when nothing is stored (tvOS may purge it);
 start from new credentials then.
 
+#### The kill switch and other network options
+
+`settings` can also return `networkOptions`, a `TunnelNetworkOptions` that every engine's profile carries alike. The
+default changes nothing:
+
+| Option | What it sets on the profile | Default |
+|---|---|---|
+| `includeAllNetworks` | The kill switch: the system routes all traffic through the tunnel, except DHCP, captive portals and what the system keeps out by default (cellular services, push notifications, connected devices). | off |
+| `excludeLocalNetworks` | LAN traffic (printers, AirPlay) stays outside the tunnel. It matters when `includeAllNetworks` or `enforceRoutes` is on. | nil: each engine's own. The Xray and Hysteria profiles exclude local networks; the WireGuard profile keeps the system's default (excluded on iOS, included on macOS). |
+| `enforceRoutes` | The tunnel's routes take precedence over the local network's, so a network cannot draw traffic outside the tunnel with a more specific route. | off |
+
+The options are part of the profile, so a running tunnel keeps the ones it started with: call `restart()` to apply a
+change. tvOS has neither `includeAllNetworks` nor `excludeLocalNetworks`. Apple documents how the options route, not
+what the system does while a tunnel reconnects: check the kill switch on a device before relying on it.
+
+> [!WARNING]
+> Mullvad reports that with `includeAllNetworks` on, an App Store update of the app can leave the device with no
+> network at all: the update stops the running extension, the system lets no traffic out, and the download of the new
+> version waits for a network that never comes. A restart of the device usually recovers; Mullvad found no way for an
+> app to detect or avoid it ([Why we still don't use includeAllNetworks](https://mullvad.net/en/blog/why-we-still-dont-use-includeallnetworks),
+> March 2025). Test an update with the kill switch on before you ship it on by default.
+
 ### 5. Split tunnelling (macOS)
 
 Add a transparent-proxy extension that subclasses `SplitTunnelProxyProvider`, name it in
