@@ -13,9 +13,9 @@ import WireGuardKit
 // MARK: - Restart
 
 extension TunnelManager {
-    /// Starts the tunnel again on the node it last used, with the DNS and obfuscation settings as they are now, so a
-    /// change to either applies without new credentials. A running tunnel is stopped first. Returns once connected,
-    /// as `start(from:)` does.
+    /// Starts the tunnel again on the node it last used, with the DNS, obfuscation and network settings as they are now,
+    /// so a change to any of them applies without new credentials. A running tunnel is stopped first. Returns once
+    /// connected, as `start(from:)` does.
     ///
     /// Throws `.noStoredConfiguration`, and leaves the tunnel as it is, when nothing is stored to start it from: no
     /// tunnel was started yet, or the system purged the configuration (tvOS may purge it from its caches).
@@ -31,7 +31,8 @@ extension TunnelManager {
             try await service.modify(
                 tunnel: tunnel,
                 isOnDemandEnabled: true,
-                tunnelConfiguration: Self.configuration(configuration, withDNS: storage.selectedDNS)
+                tunnelConfiguration: applyingSettings(to: configuration),
+                networkOptions: storage.networkOptions
             )
             try await activate(tunnel, in: service)
         case var .xray(model):
@@ -42,11 +43,24 @@ extension TunnelManager {
         }
     }
 
-    /// `configuration` with `dns` as its resolvers; the keys, the peer and any AmneziaWG parameters stay.
-    static func configuration(_ configuration: TunnelConfiguration, withDNS dns: DNSServerType) -> TunnelConfiguration {
+    /// A WireGuard configuration with the DNS and IPv6 settings as they are now, as every start and restart writes it.
+    /// `nodeAddresses`: the addresses the node assigned, when the configuration is a node's first.
+    func applyingSettings(to configuration: TunnelConfiguration, nodeAddresses: [String] = []) -> TunnelConfiguration {
+        let ipv6 = storage.networkOptions.ipv6
+        return Self.configuration(
+            Self.configuration(configuration, withDNS: storage.dnsConfiguration, includingIPv6: ipv6 == .tunnel),
+            routingIPv6: ipv6,
+            nodeAddresses: nodeAddresses
+        )
+    }
+
+    /// `configuration` with `dns` as its resolvers, over HTTPS when `dns` has a DoH URL; the keys, the peer and any
+    /// AmneziaWG parameters stay. The IPv6 servers are left out unless the tunnel routes IPv6 (`includingIPv6`).
+    static func configuration(_ configuration: TunnelConfiguration, withDNS dns: DNSConfiguration, includingIPv6: Bool) -> TunnelConfiguration {
         var interface = configuration.interface
-        interface.dns = dns.addresses.compactMap { DNSServer(from: $0) }
+        interface.dns = dns.servers(includingIPv6: includingIPv6).compactMap { DNSServer(from: $0) }
         interface.dnsSearch = []
+        interface.dnsOverHTTPSURL = dns.isEncrypted ? dns.dohURL : nil
         return TunnelConfiguration(name: configuration.name, interface: interface, peers: configuration.peers)
     }
 }

@@ -51,7 +51,7 @@ of its own, and the app links no engine at all.
 |---|---|---|
 | `DVPNSDK` | the app | The backend client: `BackendConfiguration` and one dependency client per area (`NodeCatalogClient`, `ConnectionAPIClient`, `DeviceAPIClient`, `ConfigAPIClient`, `APIEndpointClient`, `DeviceEventsClient`); the mirrors that stand in for the API when it cannot be reached; typed `APIError`s. |
 | `DVPNTunnel` | the app | `TunnelManager`: `start(from:)` connects to the node in a set of credentials, `restart()`, `stop()`, `isActive()`, `events()`. On macOS also `SplitTunnelManager`. |
-| `DVPNCoreKit` | the app and every extension | `DVPNCoreConfiguration`, the App Group paths, DNS settings. |
+| `DVPNCoreKit` | the app and every extension | `DVPNCoreConfiguration`, the App Group paths, the DNS configurations and network options. |
 | `DVPNWireGuardProvider`, `DVPNXRayProvider`, `DVPNHysteriaProvider` | one extension each | The `NEPacketTunnelProvider` base classes. |
 | `DVPNSplitTunnelProvider` | a macOS extension | `SplitTunnelProxyProvider`, a transparent proxy that lets chosen apps bypass the VPN. |
 | `DVPNSplitTunnelCore` | the macOS app | The split-tunnel setting, shared with that extension. |
@@ -168,11 +168,69 @@ try await tunnels.start(from: credentials)
 > credential calls: the Xray extension serves `.xray` and `.v2ray`, the WireGuard extension `.wireguard` and
 > `.amneziawg`, the Hysteria extension `.hysteria`.
 
-`settings` supplies the DNS servers and whether Xray fragments its TLS ClientHello.
+`settings` supplies the DNS resolvers and whether Xray fragments its TLS ClientHello.
 `TunnelManager` reads both when a tunnel starts. To apply a change to either, call `restart()`: it starts the tunnel
 again on the same node from the configuration the last start stored, with no new credentials. It throws
 `TunnelsServiceError.noStoredConfiguration`, leaving the tunnel as it is, when nothing is stored (tvOS may purge it);
 start from new credentials then.
+
+#### DNS: presets, filtering and DNS over HTTPS
+
+`settings.dnsConfiguration` names the tunnel's resolvers: servers and, optionally, the DNS-over-HTTPS endpoint they
+serve. With a DoH URL the system asks every query over HTTPS (`NEDNSOverHTTPSSettings`), so the node the tunnel goes
+through sees neither the names looked up nor the answers; without one the servers answer plain DNS, inside the tunnel.
+Every engine applies it alike. An app that implements only `selectedDNS` keeps that provider's servers in plain DNS,
+as before.
+
+| Preset | Filtering | DoH endpoint |
+|---|---|---|
+| `.cloudflare` | none | `https://cloudflare-dns.com/dns-query` |
+| `.cloudflareMalwareBlocking` | malware (1.1.1.1 for Families) | `https://security.cloudflare-dns.com/dns-query` |
+| `.cloudflareFamily` | malware and adult content (1.1.1.1 for Families) | `https://family.cloudflare-dns.com/dns-query` |
+| `.quad9` | malware, DNSSEC validated | `https://dns.quad9.net/dns-query` |
+| `.adGuard` | ads and trackers | `https://dns.adguard-dns.com/dns-query` |
+| `.adGuardFamily` | ads, trackers and adult content, safe search | `https://family.adguard-dns.com/dns-query` |
+| `.google` | none | `https://dns.google/dns-query` |
+
+- `DNSConfiguration.presets` lists them; each has its provider's IPv4 and IPv6 addresses as its documentation gives
+  them. `.unencrypted` gives the same servers in plain DNS.
+- `DNSConfiguration.custom(servers:dohURL:)` takes an app's own: IP addresses, at least one IPv4, and an `https` DoH
+  URL or none. It returns nil otherwise.
+- A tunnel uses the IPv6 servers only when it routes IPv6 (`networkOptions.ipv6 == .tunnel`): otherwise the system
+  would reach them around the tunnel.
+- The system's failover to "the default system resolver" (`NEDNSSettings.allowFailover`) stays off, since that
+  resolver is the network's, outside the tunnel. A DoH server that does not answer means no DNS rather than plain DNS
+  outside the tunnel.
+- `DNSConfiguration` is `Codable`, and a stored `DNSServerType` decodes as one.
+- The Mullvad presets (`.mullvad`, `.mullvadAdBlock`, …) are deprecated and left out of `presets`. Mullvad's public
+  encrypted DNS ends on 2 November 2026
+  ([announcement](https://mullvad.net/en/blog/2026/9/3/shutting-down-our-public-encrypted-dns-servers-and-sponsoring-quad9-instead)),
+  and it answers DoH only.
+
+#### The kill switch and other network options
+
+`settings` can also return `networkOptions`, a `TunnelNetworkOptions` that every engine's profile carries alike. The
+default changes nothing:
+
+| Option | What it sets on the profile | Default |
+|---|---|---|
+| `includeAllNetworks` | The kill switch: the system routes all traffic through the tunnel, except DHCP, captive portals and what the system keeps out by default (cellular services, push notifications, connected devices). | off |
+| `excludeLocalNetworks` | LAN traffic (printers, AirPlay) stays outside the tunnel. It matters when `includeAllNetworks` or `enforceRoutes` is on. | nil: each engine's own. The Xray and Hysteria profiles exclude local networks; the WireGuard profile keeps the system's default (excluded on iOS, included on macOS). |
+| `enforceRoutes` | The tunnel's routes take precedence over the local network's, so a network cannot draw traffic outside the tunnel with a more specific route. | off |
+| `ipv6` | `.tunnel`: all IPv6 goes into the tunnel, through the node when it carries IPv6 and dropped when it does not, so none goes around it. A WireGuard tunnel takes the IPv6 address the node assigned, or a unique local placeholder that the node drops when it assigned none; the Xray and Hysteria tunnels route IPv6 to the engine. `.unchanged`: IPv6 stays outside the tunnel, as before. | `.unchanged` |
+
+The options are part of the profile and of each engine's configuration, so a running tunnel keeps the ones it started
+with: call `restart()` to apply a change. tvOS has neither `includeAllNetworks` nor `excludeLocalNetworks`. Apple
+documents how the options route, not what the system does while a tunnel reconnects: check the kill switch on a device
+before relying on it. On a network with IPv6, `includeAllNetworks` without `ipv6: .tunnel` leaves IPv6 to the system;
+turn both on for a tunnel that nothing goes around.
+
+> [!WARNING]
+> Mullvad reports that with `includeAllNetworks` on, an App Store update of the app can leave the device with no
+> network at all: the update stops the running extension, the system lets no traffic out, and the download of the new
+> version waits for a network that never comes. A restart of the device usually recovers; Mullvad found no way for an
+> app to detect or avoid it ([Why we still don't use includeAllNetworks](https://mullvad.net/en/blog/why-we-still-dont-use-includeallnetworks),
+> March 2025). Test an update with the kill switch on before you ship it on by default.
 
 ### 5. Split tunnelling (macOS)
 
@@ -196,7 +254,7 @@ The model can also be filled in field by field from the same answer:
 
 | Node type | `endpoint` | Also needs |
 |---|---|---|
-| WireGuard | `.wireGuard(WireGuardEndpoint(host:port:clientAddress:peerPublicKey:))` | `privateKey`: the answer's WireGuard private key (`private_key`) |
+| WireGuard | `.wireGuard(WireGuardEndpoint(host:port:clientAddress:peerPublicKey:clientAddresses:))`, `clientAddresses` every address of the answer's `addrs` (an IPv6 one included) | `privateKey`: the answer's WireGuard private key (`private_key`) |
 | AmneziaWG | `.amneziaWG(AmneziaWGEndpoint(wireGuard:parameters:))`, the parameters as their `[Interface]` keys (`S1`, `H1`, …) | `privateKey`, as for WireGuard |
 | Xray | `.xrayNode(XrayNodeEndpoint(host:inbounds:))` | `uid`: the answer's client UUID |
 | V2Ray | `.v2ray(V2RayNodeEndpoint(host:inbounds:))` | `uid`, as for Xray |

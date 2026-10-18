@@ -78,6 +78,7 @@ extension TunnelConfiguration {
                         "listenport",
                         "address",
                         "dns",
+                        "dnsoverhttps",
                         "mtu",
                         "jc",
                         "jmin",
@@ -248,6 +249,9 @@ extension TunnelConfiguration {
             let dnsString = dnsLine.joined(separator: ", ")
             output.append("DNS = \(dnsString)\n")
         }
+        if let dnsOverHTTPSURL = interface.dnsOverHTTPSURL {
+            output.append("DNSOverHTTPS = \(dnsOverHTTPSURL.absoluteString)\n")
+        }
         if let mtu = interface.mtu {
             output.append("MTU = \(mtu)\n")
         }
@@ -309,6 +313,12 @@ extension TunnelConfiguration {
             }
             interface.dns = dnsServers
             interface.dnsSearch = dnsSearch
+        }
+        if let dnsOverHTTPSString = attributes["dnsoverhttps"], !dnsOverHTTPSString.isEmpty {
+            guard let url = URL(string: dnsOverHTTPSString), url.scheme?.lowercased() == "https" else {
+                throw ParseError.interfaceHasInvalidDNS(dnsOverHTTPSString)
+            }
+            interface.dnsOverHTTPSURL = url
         }
         if let mtuString = attributes["mtu"] {
             guard let mtu = UInt16(mtuString) else {
