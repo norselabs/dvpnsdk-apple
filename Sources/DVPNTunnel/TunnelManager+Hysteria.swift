@@ -48,6 +48,7 @@ extension TunnelManager {
         let service = try await loadService()
 
         TunnelConfigDirectories.storeDNS(storage.selectedDNS)
+        TunnelConfigDirectories.storeNetwork(NetworkModel(options: storage.networkOptions))
         do {
             try HysteriaConfigurationStore.save(configuration)
         } catch {
@@ -55,7 +56,7 @@ extension TunnelManager {
             throw .addTunnelFailed(systemError: error)
         }
 
-        let tunnel = try await service.startProxyTunnel(descriptor, onDemandEnabled: true)
+        let tunnel = try await service.startProxyTunnel(descriptor, onDemandEnabled: true, networkOptions: storage.networkOptions)
         try await activate(tunnel, in: service)
     }
 }

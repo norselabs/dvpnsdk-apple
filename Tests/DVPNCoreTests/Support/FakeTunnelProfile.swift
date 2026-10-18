@@ -130,4 +130,9 @@ final class FakeTunnelProfileStore: TunnelProfileStore {
 
 final class FakeTunnelSettings: TunnelSettingsProviding {
     let selectedDNS: DNSServerType = .cloudflare
+    let networkOptions: TunnelNetworkOptions
+
+    init(networkOptions: TunnelNetworkOptions = .default) {
+        self.networkOptions = networkOptions
+    }
 }

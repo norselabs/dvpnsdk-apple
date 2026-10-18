@@ -45,4 +45,22 @@ struct TunnelConfigDirectoriesTests {
 
         #expect(TunnelConfigDirectories.dns(in: defaults) == ["1.1.1.1", "1.0.0.1"])
     }
+
+    @Test
+    func aStoredNetworkIsReadBack() {
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let network = NetworkModel(hideVPNIcon: false, ipv6Enabled: true)
+
+        TunnelConfigDirectories.storeNetwork(network, in: defaults)
+
+        #expect(TunnelConfigDirectories.network(in: defaults) == network)
+    }
+
+    /// What a proxy extension finds when the app that started it predates the stored network: IPv6 left out.
+    @Test
+    func withNoNetworkStoredTheDefaultApplies() {
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        #expect(TunnelConfigDirectories.network(in: defaults) == .default)
+    }
 }

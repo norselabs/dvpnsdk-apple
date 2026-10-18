@@ -39,6 +39,13 @@ open class ProxyPacketTunnelProvider: NEPacketTunnelProvider {
     }
 
     open func makeNetworkSettings(network: NetworkModel) -> NEPacketTunnelNetworkSettings {
+        Self.networkSettings(network: network, mtu: mtu, dnsServers: TunnelConfigDirectories.dns())
+    }
+
+    /// Every IPv4 route into the tunnel and, when `network` enables IPv6, every IPv6 route too, from a unique local
+    /// address: hev-socks5-tunnel hands IPv6 connections to the engine like IPv4 ones, and without IPv6 settings the
+    /// system would send IPv6 around the tunnel.
+    static func networkSettings(network: NetworkModel, mtu: Int, dnsServers: [String]) -> NEPacketTunnelNetworkSettings {
         let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "254.1.1.1")
         settings.mtu = NSNumber(value: mtu)
         settings.ipv4Settings = {
@@ -60,13 +67,13 @@ open class ProxyPacketTunnelProvider: NEPacketTunnelProvider {
             }
             return settings
         }()
-        settings.dnsSettings = NEDNSSettings(servers: TunnelConfigDirectories.dns())
+        settings.dnsSettings = NEDNSSettings(servers: dnsServers)
         return settings
     }
 
     override open nonisolated(nonsending) func startTunnel(options: [String: NSObject]? = nil) async throws {
         ProxyStartErrorStore.clear()
-        let network = NetworkModel.default
+        let network = TunnelConfigDirectories.network()
         // On every platform, for `TunnelManager.connectedNode()`. Before the tunnel's interface appears, so the macOS
         // split-tunnel proxy sees both together.
         TunnelStateStore.record(isUp: true, server: nodeHost)

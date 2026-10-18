@@ -13,9 +13,9 @@ import WireGuardKit
 // MARK: - Restart
 
 extension TunnelManager {
-    /// Starts the tunnel again on the node it last used, with the DNS and obfuscation settings as they are now, so a
-    /// change to either applies without new credentials. A running tunnel is stopped first. Returns once connected,
-    /// as `start(from:)` does.
+    /// Starts the tunnel again on the node it last used, with the DNS, obfuscation and network settings as they are now,
+    /// so a change to any of them applies without new credentials. A running tunnel is stopped first. Returns once
+    /// connected, as `start(from:)` does.
     ///
     /// Throws `.noStoredConfiguration`, and leaves the tunnel as it is, when nothing is stored to start it from: no
     /// tunnel was started yet, or the system purged the configuration (tvOS may purge it from its caches).
@@ -28,10 +28,15 @@ extension TunnelManager {
 
         switch stored {
         case let .wireGuard(configuration):
+            let restarted = Self.configuration(
+                Self.configuration(configuration, withDNS: storage.selectedDNS),
+                routingIPv6: storage.networkOptions.ipv6
+            )
             try await service.modify(
                 tunnel: tunnel,
                 isOnDemandEnabled: true,
-                tunnelConfiguration: Self.configuration(configuration, withDNS: storage.selectedDNS)
+                tunnelConfiguration: restarted,
+                networkOptions: storage.networkOptions
             )
             try await activate(tunnel, in: service)
         case var .xray(model):

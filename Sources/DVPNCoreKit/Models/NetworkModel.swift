@@ -20,9 +20,14 @@ public struct NetworkModel: Codable, Equatable, Sendable {
 // MARK: - Default
 
 public extension NetworkModel {
-    /// What the proxy providers run with: the VPN icon shown, IPv6 left out.
+    /// What the proxy providers run with when the app stored nothing else: the VPN icon shown, IPv6 left out.
     static let `default` = NetworkModel(
         hideVPNIcon: false,
         ipv6Enabled: false
     )
+
+    /// The default with IPv6 as `options` route it.
+    init(options: TunnelNetworkOptions) {
+        self.init(hideVPNIcon: NetworkModel.default.hideVPNIcon, ipv6Enabled: options.ipv6 == .tunnel)
+    }
 }

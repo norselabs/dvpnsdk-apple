@@ -114,10 +114,11 @@ extension TunnelsService {
 extension TunnelsService {
     /// Points the managed tunnel at a proxy-engine extension (Xray, Hysteria). Those providers
     /// read their configuration from the App Group on start, so the provider protocol carries
-    /// only the extension identity.
+    /// only the extension identity and how it routes (`networkOptions`).
     func startProxyTunnel(
         _ descriptor: TunnelProtocolDescriptor,
-        onDemandEnabled: Bool
+        onDemandEnabled: Bool,
+        networkOptions: TunnelNetworkOptions = .default
     ) async throws(TunnelsServiceError) -> TunnelContainer {
         let existing = tunnels.last
         let manager = existing?.tunnelProvider ?? store.makeProfile()
@@ -128,9 +129,8 @@ extension TunnelsService {
             protocolConfiguration.providerBundleIdentifier = descriptor.providerBundleID
             protocolConfiguration.serverAddress = descriptor.tunnelName
             protocolConfiguration.providerConfiguration = [:]
-#if !os(tvOS)
-            protocolConfiguration.excludeLocalNetworks = true
-#endif
+            // The proxy engines keep local networks outside the tunnel unless the options say otherwise.
+            protocolConfiguration.apply(networkOptions, excludingLocalNetworksByDefault: true)
             return protocolConfiguration
         }()
         manager.isEnabled = onDemandEnabled
@@ -158,7 +158,8 @@ extension TunnelsService {
 
     func add(
         tunnelConfiguration: TunnelConfiguration,
-        onDemandEnabled: Bool
+        onDemandEnabled: Bool,
+        networkOptions: TunnelNetworkOptions = .default
     ) async throws(TunnelsServiceError) -> TunnelContainer {
         guard let name = tunnelConfiguration.name, !name.isEmpty else {
             throw .emptyName
@@ -168,7 +169,7 @@ extension TunnelsService {
         }
 
         let manager = store.makeProfile()
-        manager.set(tunnelConfiguration: tunnelConfiguration)
+        manager.set(tunnelConfiguration: tunnelConfiguration, networkOptions: networkOptions)
         manager.isEnabled = onDemandEnabled
         manager.onDemandRules = [Self.connectOnDemandRule()]
         manager.isOnDemandEnabled = true
@@ -207,13 +208,14 @@ extension TunnelsService {
         }
     }
 
-    /// Saves a new configuration. If the tunnel is live and the configuration changed, the tunnel is
-    /// stopped so the changes take effect; the method returns once it is `.disconnected` and the caller
-    /// is expected to `startActivation(of:)` again.
+    /// Saves a new configuration. If the tunnel is live and the configuration changed (the WireGuard configuration, the
+    /// network options, or the extension the profile points at), the tunnel is stopped so the changes take effect; the
+    /// method returns once it is `.disconnected` and the caller is expected to `startActivation(of:)` again.
     func modify(
         tunnel: TunnelContainer,
         isOnDemandEnabled: Bool,
-        tunnelConfiguration: TunnelConfiguration
+        tunnelConfiguration: TunnelConfiguration,
+        networkOptions: TunnelNetworkOptions = .default
     ) async throws(TunnelsServiceError) {
         guard let name = tunnelConfiguration.name, !name.isEmpty else {
             throw .emptyName
@@ -230,9 +232,13 @@ extension TunnelsService {
             }
         }
 
+        // The stored WireGuard file outlives a switch to a proxy engine, so the same configuration can come back while
+        // the profile still points at the proxy's extension.
         let isTunnelConfigurationChanged = manager.tunnelConfiguration != tunnelConfiguration
+            || manager.provider?.providerBundleIdentifier != TunnelEnvironment.requiredConfiguration.descriptor(for: .wireGuard)?.providerBundleID
+            || manager.provider?.carries(networkOptions) != true
         if isTunnelConfigurationChanged {
-            manager.set(tunnelConfiguration: tunnelConfiguration)
+            manager.set(tunnelConfiguration: tunnelConfiguration, networkOptions: networkOptions)
         }
 
         do {

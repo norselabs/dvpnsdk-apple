@@ -3,6 +3,7 @@
 //  DVPNSDK
 //
 
+import DVPNCoreKit
 import DVPNWireGuardCore
 import Foundation
 import NetworkExtension
@@ -106,10 +107,11 @@ extension TunnelProfile {
         return provider.asTunnelConfiguration(with: localizedDescription)
     }
 
-    func set(tunnelConfiguration: TunnelConfiguration) {
+    func set(tunnelConfiguration: TunnelConfiguration, networkOptions: TunnelNetworkOptions = .default) {
         protocolConfiguration = NETunnelProviderProtocol(
             tunnelConfiguration: tunnelConfiguration,
-            previouslyFrom: protocolConfiguration
+            previouslyFrom: protocolConfiguration,
+            networkOptions: networkOptions
         )
         localizedDescription = tunnelConfiguration.name
     }
