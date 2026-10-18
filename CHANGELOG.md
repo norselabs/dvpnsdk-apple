@@ -5,6 +5,36 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ## Unreleased
 
+### Added
+
+- `TunnelNetworkOptions`, returned by `TunnelSettingsProviding.networkOptions` (`.default` unless an app returns its
+  own): the kill switch (`includeAllNetworks`), local networks (`excludeLocalNetworks`) and enforced routes
+  (`enforceRoutes`), on every engine's profile alike. They apply when the profile is saved, so a running tunnel needs a
+  `restart()`. The default leaves each profile as before: WireGuard's with the system's default for local networks,
+  Xray's and Hysteria's excluding them.
+- `TunnelNetworkOptions.ipv6`: `.tunnel` sends all IPv6 into the tunnel instead of around it. A WireGuard tunnel takes
+  `::/0` and the IPv6 address the node assigned, or a unique local placeholder the node drops when it assigned none;
+  the Xray and Hysteria providers run with IPv6 enabled, which the app now stores for them
+  (`TunnelConfigDirectories.storeNetwork`). `.unchanged`, the default, routes IPv6 as before.
+- `WireGuardEndpoint.clientAddresses`: every address the node assigned the client, its IPv6 address included; the
+  decoder used to keep the first only.
+- `DNSConfiguration` and `TunnelSettingsProviding.dnsConfiguration`: a tunnel's resolvers as servers and an optional
+  DNS-over-HTTPS URL, applied through `NEDNSOverHTTPSSettings` by the WireGuard extension and the proxy providers
+  alike. Presets with each provider's IPv4 and IPv6 addresses and DoH endpoint: Cloudflare (standard, malware
+  blocking, family), Quad9, AdGuard (default, family) and Google, in `DNSConfiguration.presets`; `custom(...)` for an
+  app's own; `unencrypted` for plain DNS. IPv6 servers are used only with `ipv6: .tunnel`. The Mullvad presets are
+  deprecated already: Mullvad ends that service on 2 November 2026. `DNSServerType` stays, as
+  `DNSServerType.configuration` (its servers in plain DNS), and a stored `DNSServerType` decodes as a
+  `DNSConfiguration`. `selectedDNS` now has a default, so an app may implement `dnsConfiguration` alone.
+- WireGuardKit: `InterfaceConfiguration.dnsOverHTTPSURL`, stored as a `DNSOverHTTPS` key in the configuration text.
+- `TunnelManager.switchNode(to:)`: moves a running tunnel to the node in new credentials. On the same engine the
+  extension changes nodes in place, keeping the tunnel interface and its routes, so traffic waits for the new node
+  instead of going around the tunnel: the WireGuard provider updates its engine (`WireGuardAdapter.update`), the Xray
+  and Hysteria providers restart their engine alone behind the same hev-socks5-tunnel. A node that does not answer, or
+  an engine that cannot start on it, leaves the tunnel up. Otherwise (the tunnel is down, another engine runs, or the
+  extension predates the message) it stops the tunnel and starts it from the credentials. The providers answer the
+  new `switchNode` app message; one built before it answers nothing, and the app falls back to the full start.
+
 ### Changed
 
 - The split-tunnel proxy's warning about a flow with no physical interface no longer names the app; a debug line,
@@ -26,6 +56,11 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   stopped being `LocalizedError`s.
 - `WireGuardAdapter.start` builds without the "'weak' ownership of capture 'self'" warning that recent Swift
   compilers give in every app that builds the package.
+- An app that declares no WireGuard extension no longer traps when `TunnelManager` loads its tunnels. WireGuard and
+  AmneziaWG credentials then fail at `start(from:)` with `TunnelsServiceError.unsupportedProtocol`, as the other
+  engines' do, and `NETunnelProviderProtocol(tunnelConfiguration:)` returns nil instead of trapping.
+- A WireGuard start rewrites a profile that still points at a proxy engine's extension even when the WireGuard
+  configuration is the one stored before; it used to keep the proxy's extension.
 
 ## 0.3.0 (2026-10-13)
 

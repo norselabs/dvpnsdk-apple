@@ -43,6 +43,20 @@ struct ConnectionCredentialsDecodingTests {
         )
     }
 
+    /// A node that serves IPv6 assigns the client an address of each family; both are kept, the IPv4 one first.
+    @Test
+    func aWireGuardNodesIPv6AddressIsKept() throws {
+        var handshake = wireGuardHandshake
+        handshake["addrs"] = ["10.10.0.2/32", "fd86:ea04:1115::2/128"]
+        let data = try credentialsJSON(protocol: "WIREGUARD", handshake: handshake)
+
+        let credentials = try JSONDecoder().decode(ConnectionCredentials.self, from: data)
+
+        guard case let .wireGuard(endpoint) = credentials.endpoint else { Issue.record("expected a WireGuard endpoint"); return }
+        #expect(endpoint.clientAddress == "10.10.0.2")
+        #expect(endpoint.clientAddresses == ["10.10.0.2", "fd86:ea04:1115::2"])
+    }
+
     /// V2RAY nodes keep the earlier enums (VLESS 1 / VMess 2; gRPC 3, TCP 7, WebSocket 8; security none 1 / tls 2).
     /// Every inbound this build knows is decoded as sent; which one to dial is DVPNTunnel's decision.
     @Test

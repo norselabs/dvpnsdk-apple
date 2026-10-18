@@ -86,12 +86,43 @@ open class WireGuardPacketTunnelProvider: NEPacketTunnelProvider {
     }
 
     override open nonisolated(nonsending) func handleAppMessage(_ messageData: Data) async -> Data? {
-        guard messageData.count == 1, messageData[0] == 0 else { return nil }
-
-        let settings = await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
-            adapter.getRuntimeConfiguration { continuation.resume(returning: $0) }
+        switch TunnelProviderMessage(messageData) {
+        case .runtimeConfiguration:
+            let settings = await withCheckedContinuation { (continuation: CheckedContinuation<String?, Never>) in
+                adapter.getRuntimeConfiguration { continuation.resume(returning: $0) }
+            }
+            return settings?.data(using: .utf8)
+        case .switchNode:
+            return await switchNode().data
+        case nil:
+            return nil
         }
-        return settings?.data(using: .utf8)
+    }
+
+    /// Connects the running engine to the node of the configuration the app stored, in place: the adapter applies the
+    /// new peer and network settings to the same tunnel interface (`WireGuardAdapter.update`), so traffic waits for the
+    /// new node instead of going around the tunnel. When the update fails, the engine stays on the node it had.
+    private nonisolated(nonsending) func switchNode() async -> NodeSwitchReply {
+        guard let tunnelProviderProtocol = protocolConfiguration as? NETunnelProviderProtocol,
+              let tunnelConfiguration = tunnelProviderProtocol.asTunnelConfiguration()
+        else {
+            logger.error("Switching node failed: no stored WireGuard configuration")
+            return .failed("No stored WireGuard configuration")
+        }
+
+        // Before the new peer's traffic starts, as at the start, so the macOS split-tunnel proxy leaves it out.
+        let previousNode = TunnelStateStore.server()
+        TunnelStateStore.record(isUp: true, server: tunnelConfiguration.peers.first?.endpoint.map { "\($0.host)" })
+        let adapterError = await withCheckedContinuation { (continuation: CheckedContinuation<WireGuardAdapterError?, Never>) in
+            adapter.update(tunnelConfiguration: tunnelConfiguration) { continuation.resume(returning: $0) }
+        }
+        if let adapterError {
+            logger.error("Switching node failed: \(String(describing: adapterError), privacy: .public)")
+            TunnelStateStore.record(isUp: true, server: previousNode)
+            return .failed("WireGuardAdapter.update failed: \(adapterError)")
+        }
+        logger.info("Switched node in place")
+        return .switched
     }
 
     private static func map(_ error: WireGuardAdapterError) -> PacketTunnelProviderError {

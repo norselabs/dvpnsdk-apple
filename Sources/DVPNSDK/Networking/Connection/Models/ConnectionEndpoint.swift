@@ -25,13 +25,19 @@ public enum ConnectionEndpoint: Equatable, Sendable {
 public struct WireGuardEndpoint: Equatable, Sendable {
     public let host: String
     public let port: UInt16
+    /// The first address the node assigned the client, the one the tunnel always takes.
     public let clientAddress: String
+    /// Every address the node assigned the client, without prefix lengths and `clientAddress` first: a Sentinel node
+    /// assigns one per IP family it serves, IPv4 before IPv6. The tunnel takes the IPv6 one when it routes IPv6.
+    public let clientAddresses: [String]
     public let peerPublicKey: String
 
-    public init(host: String, port: UInt16, clientAddress: String, peerPublicKey: String) {
+    /// `clientAddresses` nil: `clientAddress` alone.
+    public init(host: String, port: UInt16, clientAddress: String, peerPublicKey: String, clientAddresses: [String]? = nil) {
         self.host = host
         self.port = port
         self.clientAddress = clientAddress
+        self.clientAddresses = clientAddresses ?? [clientAddress]
         self.peerPublicKey = peerPublicKey
     }
 }

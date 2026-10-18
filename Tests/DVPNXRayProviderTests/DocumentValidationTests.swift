@@ -21,8 +21,10 @@ extension LibXrayTests {
                 DVPNCoreConfiguration(
                     appGroupID: "group.com.example.vpn.tests",
                     protocols: [
-                        TunnelProtocolDescriptor(id: .wireGuard, providerBundleID: "wg", tunnelName: "WireGuard", readiness: .wireGuardHandshake),
-                        TunnelProtocolDescriptor(id: .xray, providerBundleID: "xray", tunnelName: "Xray", readiness: .immediate),
+                        TunnelProtocolDescriptor(
+                            id: .wireGuard, providerBundleID: "com.example.vpn.wireguard-ne", tunnelName: "WireGuard", readiness: .wireGuardHandshake
+                        ),
+                        TunnelProtocolDescriptor(id: .xray, providerBundleID: "com.example.vpn.v2ray-ne", tunnelName: "Xray", readiness: .immediate),
                     ]
                 )
             )

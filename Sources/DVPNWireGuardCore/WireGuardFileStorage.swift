@@ -30,8 +30,10 @@ public struct WireGuardFileConfiguration: Codable, Sendable {
 
 // MARK: - WireGuardFileStorage
 
-final class WireGuardFileStorage {
-    static func save(
+package final class WireGuardFileStorage {
+    /// Also how the app hands a running tunnel the node to switch to (`TunnelProviderMessage.switchNode`): the
+    /// provider reads the file again, the profile stays as it is.
+    package static func save(
         tunnelConfiguration: TunnelConfiguration,
         named name: String
     ) throws {
