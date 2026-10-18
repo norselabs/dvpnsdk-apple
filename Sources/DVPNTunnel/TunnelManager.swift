@@ -125,6 +125,8 @@ extension TunnelManager {
 
 extension TunnelManager {
     func startWireguard(from credentials: ConnectionCredentials) async throws(TunnelsServiceError) {
+        // Before anything is saved: an app without the WireGuard extension cannot run this node.
+        _ = try requiredDescriptor(for: .wireGuard)
         let service = try await loadService()
 
         if tunnelModel.peersModel.isEmpty { throw .emptyCredentials }
@@ -315,7 +317,8 @@ extension TunnelManager {
     }
 
     func prepareTunnelModel() {
-        tunnelModel.interfaceModel[.name] = configuration.requiredDescriptor(for: .wireGuard).tunnelName
+        // Without the WireGuard extension the model is never saved (`startWireguard` refuses first), so it needs no name.
+        tunnelModel.interfaceModel[.name] = configuration.descriptor(for: .wireGuard)?.tunnelName ?? ""
         if tunnelModel.peersModel.isEmpty {
             tunnelModel.appendEmptyPeer()
         }
