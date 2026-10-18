@@ -128,7 +128,29 @@ extension TunnelManager {
         // Before anything is saved: an app without the WireGuard extension cannot run this node.
         _ = try requiredDescriptor(for: .wireGuard)
         let service = try await loadService()
+        let tunnelConfiguration = try wireGuardConfiguration(from: credentials)
 
+        let tunnel: TunnelContainer
+        if let existing = service.tunnels.last {
+            try await service.modify(
+                tunnel: existing,
+                isOnDemandEnabled: true,
+                tunnelConfiguration: tunnelConfiguration,
+                networkOptions: storage.networkOptions
+            )
+            tunnel = existing
+        } else {
+            tunnel = try await service.add(
+                tunnelConfiguration: tunnelConfiguration, onDemandEnabled: true, networkOptions: storage.networkOptions
+            )
+        }
+
+        try await activate(tunnel, in: service)
+    }
+
+    /// The configuration of a backend WireGuard or AmneziaWG node, with the DNS and IPv6 settings as they are now. The
+    /// tunnel service must be loaded: it prepares the model this is built on.
+    func wireGuardConfiguration(from credentials: ConnectionCredentials) throws(TunnelsServiceError) -> TunnelConfiguration {
         if tunnelModel.peersModel.isEmpty { throw .emptyCredentials }
 
         guard let rawKey = credentials.privateKey, let privateKey = PrivateKey(base64Key: rawKey) else {
@@ -163,23 +185,7 @@ extension TunnelManager {
                 throw .addTunnelFailed(systemError: error)
             }
         }
-
-        let tunnel: TunnelContainer
-        if let existing = service.tunnels.last {
-            try await service.modify(
-                tunnel: existing,
-                isOnDemandEnabled: true,
-                tunnelConfiguration: tunnelConfiguration,
-                networkOptions: storage.networkOptions
-            )
-            tunnel = existing
-        } else {
-            tunnel = try await service.add(
-                tunnelConfiguration: tunnelConfiguration, onDemandEnabled: true, networkOptions: storage.networkOptions
-            )
-        }
-
-        try await activate(tunnel, in: service)
+        return Self.configuration(tunnelConfiguration, routingIPv6: storage.networkOptions.ipv6, nodeAddresses: wg.clientAddresses)
     }
 }
 
@@ -247,6 +253,7 @@ extension TunnelManager {
     func startXray(source: XraySource, descriptor: TunnelProtocolDescriptor) async throws(TunnelsServiceError) {
         let service = try await loadService()
         TunnelConfigDirectories.storeDNS(storage.selectedDNS)
+        TunnelConfigDirectories.storeNetwork(NetworkModel(options: storage.networkOptions))
         do {
             try XraySourceStore.save(source)
         } catch {

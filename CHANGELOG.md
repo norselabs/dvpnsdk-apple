@@ -12,6 +12,12 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   (`enforceRoutes`), on every engine's profile alike. They apply when the profile is saved, so a running tunnel needs a
   `restart()`. The default leaves each profile as before: WireGuard's with the system's default for local networks,
   Xray's and Hysteria's excluding them.
+- `TunnelNetworkOptions.ipv6`: `.tunnel` sends all IPv6 into the tunnel instead of around it. A WireGuard tunnel takes
+  `::/0` and the IPv6 address the node assigned, or a unique local placeholder the node drops when it assigned none;
+  the Xray and Hysteria providers run with IPv6 enabled, which the app now stores for them
+  (`TunnelConfigDirectories.storeNetwork`). `.unchanged`, the default, routes IPv6 as before.
+- `WireGuardEndpoint.clientAddresses`: every address the node assigned the client, its IPv6 address included; the
+  decoder used to keep the first only.
 
 ### Changed
 

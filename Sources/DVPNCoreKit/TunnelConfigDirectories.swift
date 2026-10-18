@@ -91,6 +91,22 @@ package extension TunnelConfigDirectories {
         let servers = defaults.string(forKey: dnsKey).splitToArray(trimmingCharacters: .whitespaces)
         return servers.isEmpty ? DNSServerType.default.addresses : servers
     }
+
+    static let networkKey = "NETWORK"
+
+    /// Hands how a proxy tunnel routes (IPv6, for one) to the proxy extensions, which read it back with `network(in:)`.
+    static func storeNetwork(_ network: NetworkModel, in defaults: UserDefaults = .shared) {
+        defaults.set(try? JSONEncoder().encode(network), forKey: networkKey)
+    }
+
+    /// What a proxy tunnel runs with: what the app stored at its last start, or `NetworkModel.default` when it stored
+    /// nothing (a build that predates it, which a system on-demand start can still find).
+    static func network(in defaults: UserDefaults = .shared) -> NetworkModel {
+        guard let data = defaults.data(forKey: networkKey),
+              let network = try? JSONDecoder().decode(NetworkModel.self, from: data)
+        else { return .default }
+        return network
+    }
 }
 
 public extension TunnelConfigDirectories {

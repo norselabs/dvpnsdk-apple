@@ -75,9 +75,20 @@ struct TunnelNetworkOptionsTests {
 
     @Test
     func theOptionsRoundTripThroughCodable() throws {
-        let decoded = try JSONDecoder().decode(TunnelNetworkOptions.self, from: JSONEncoder().encode(killSwitch))
+        let options = TunnelNetworkOptions(includeAllNetworks: true, excludeLocalNetworks: false, enforceRoutes: true, ipv6: .tunnel)
 
-        #expect(decoded == killSwitch)
+        let decoded = try JSONDecoder().decode(TunnelNetworkOptions.self, from: JSONEncoder().encode(options))
+
+        #expect(decoded == options)
+    }
+
+    /// Options an app stored before an option existed decode with that option's default.
+    @Test
+    func aMissingOptionDecodesAsItsDefault() throws {
+        let decoded = try JSONDecoder().decode(TunnelNetworkOptions.self, from: Data(#"{"includeAllNetworks":true}"#.utf8))
+
+        #expect(decoded == TunnelNetworkOptions(includeAllNetworks: true))
+        #expect(try JSONDecoder().decode(TunnelNetworkOptions.self, from: Data("{}".utf8)) == .default)
     }
 
     // MARK: Profiles
@@ -186,6 +197,23 @@ struct TunnelNetworkOptionsTests {
         #expect(provider.includeAllNetworks)
         #expect(!provider.excludeLocalNetworks)
         #expect(provider.enforceRoutes)
+    }
+
+    /// The proxy extensions take IPv6 from what the app stored at the start.
+    @Test
+    func aProxyStartStoresTheIPv6Mode() async throws {
+        let hysteria = TunnelProtocolDescriptor(
+            id: .hysteria, providerBundleID: "com.example.vpn.hysteria-ne", tunnelName: "Hysteria", readiness: .immediate
+        )
+        let manager = TunnelManager(
+            settings: FakeTunnelSettings(networkOptions: TunnelNetworkOptions(ipv6: .tunnel)),
+            configuration: DVPNCoreConfiguration(appGroupID: "group.com.example.vpn.tests", protocols: [hysteria])
+        )
+        manager.attach(makeService().0)
+
+        try await manager.startHysteria(configuration: HysteriaConfiguration(server: "203.0.113.6"), descriptor: hysteria)
+
+        #expect(TunnelConfigDirectories.network().ipv6Enabled)
     }
 
     // MARK: Helpers

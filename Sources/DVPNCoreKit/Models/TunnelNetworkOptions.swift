@@ -40,14 +40,56 @@ public struct TunnelNetworkOptions: Hashable, Sendable, Codable {
     /// specific route (TunnelCrack's "LocalNet" attack).
     public var enforceRoutes: Bool
 
-    public init(includeAllNetworks: Bool = false, excludeLocalNetworks: Bool? = nil, enforceRoutes: Bool = false) {
+    /// Where IPv6 traffic goes. It lives in each engine's configuration rather than in the profile, and like the options
+    /// above it applies when a tunnel starts or restarts.
+    public var ipv6: IPv6Mode
+
+    public init(
+        includeAllNetworks: Bool = false,
+        excludeLocalNetworks: Bool? = nil,
+        enforceRoutes: Bool = false,
+        ipv6: IPv6Mode = .unchanged
+    ) {
         self.includeAllNetworks = includeAllNetworks
         self.excludeLocalNetworks = excludeLocalNetworks
         self.enforceRoutes = enforceRoutes
+        self.ipv6 = ipv6
     }
 
-    /// No kill switch, routes not enforced, local networks as each engine has them.
+    /// No kill switch, routes not enforced, local networks as each engine has them, IPv6 outside the tunnel.
     public static let `default` = TunnelNetworkOptions()
+}
+
+// MARK: - IPv6
+
+public extension TunnelNetworkOptions {
+    enum IPv6Mode: String, Hashable, Sendable, Codable, CaseIterable {
+        /// As the SDK has always routed it: outside the tunnel, so on a network with IPv6, apps reach IPv6 destinations
+        /// around the VPN.
+        case unchanged
+        /// All of it into the tunnel: through the node when the node carries IPv6, dropped when it does not, never
+        /// around the tunnel. Apps fall back to IPv4 when an IPv6 connection fails.
+        case tunnel
+    }
+}
+
+// MARK: - Codable
+
+public extension TunnelNetworkOptions {
+    private enum CodingKeys: String, CodingKey {
+        case includeAllNetworks, excludeLocalNetworks, enforceRoutes, ipv6
+    }
+
+    /// An option an earlier build did not store takes its default, so stored options keep decoding as options are added.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            includeAllNetworks: try container.decodeIfPresent(Bool.self, forKey: .includeAllNetworks) ?? false,
+            excludeLocalNetworks: try container.decodeIfPresent(Bool.self, forKey: .excludeLocalNetworks),
+            enforceRoutes: try container.decodeIfPresent(Bool.self, forKey: .enforceRoutes) ?? false,
+            ipv6: try container.decodeIfPresent(IPv6Mode.self, forKey: .ipv6) ?? .unchanged
+        )
+    }
 }
 
 // MARK: - Profile

@@ -28,10 +28,14 @@ extension TunnelManager {
 
         switch stored {
         case let .wireGuard(configuration):
+            let restarted = Self.configuration(
+                Self.configuration(configuration, withDNS: storage.selectedDNS),
+                routingIPv6: storage.networkOptions.ipv6
+            )
             try await service.modify(
                 tunnel: tunnel,
                 isOnDemandEnabled: true,
-                tunnelConfiguration: Self.configuration(configuration, withDNS: storage.selectedDNS),
+                tunnelConfiguration: restarted,
                 networkOptions: storage.networkOptions
             )
             try await activate(tunnel, in: service)

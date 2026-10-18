@@ -184,10 +184,13 @@ default changes nothing:
 | `includeAllNetworks` | The kill switch: the system routes all traffic through the tunnel, except DHCP, captive portals and what the system keeps out by default (cellular services, push notifications, connected devices). | off |
 | `excludeLocalNetworks` | LAN traffic (printers, AirPlay) stays outside the tunnel. It matters when `includeAllNetworks` or `enforceRoutes` is on. | nil: each engine's own. The Xray and Hysteria profiles exclude local networks; the WireGuard profile keeps the system's default (excluded on iOS, included on macOS). |
 | `enforceRoutes` | The tunnel's routes take precedence over the local network's, so a network cannot draw traffic outside the tunnel with a more specific route. | off |
+| `ipv6` | `.tunnel`: all IPv6 goes into the tunnel, through the node when it carries IPv6 and dropped when it does not, so none goes around it. A WireGuard tunnel takes the IPv6 address the node assigned, or a unique local placeholder that the node drops when it assigned none; the Xray and Hysteria tunnels route IPv6 to the engine. `.unchanged`: IPv6 stays outside the tunnel, as before. | `.unchanged` |
 
-The options are part of the profile, so a running tunnel keeps the ones it started with: call `restart()` to apply a
-change. tvOS has neither `includeAllNetworks` nor `excludeLocalNetworks`. Apple documents how the options route, not
-what the system does while a tunnel reconnects: check the kill switch on a device before relying on it.
+The options are part of the profile and of each engine's configuration, so a running tunnel keeps the ones it started
+with: call `restart()` to apply a change. tvOS has neither `includeAllNetworks` nor `excludeLocalNetworks`. Apple
+documents how the options route, not what the system does while a tunnel reconnects: check the kill switch on a device
+before relying on it. On a network with IPv6, `includeAllNetworks` without `ipv6: .tunnel` leaves IPv6 to the system;
+turn both on for a tunnel that nothing goes around.
 
 > [!WARNING]
 > Mullvad reports that with `includeAllNetworks` on, an App Store update of the app can leave the device with no
@@ -218,7 +221,7 @@ The model can also be filled in field by field from the same answer:
 
 | Node type | `endpoint` | Also needs |
 |---|---|---|
-| WireGuard | `.wireGuard(WireGuardEndpoint(host:port:clientAddress:peerPublicKey:))` | `privateKey`: the answer's WireGuard private key (`private_key`) |
+| WireGuard | `.wireGuard(WireGuardEndpoint(host:port:clientAddress:peerPublicKey:clientAddresses:))`, `clientAddresses` every address of the answer's `addrs` (an IPv6 one included) | `privateKey`: the answer's WireGuard private key (`private_key`) |
 | AmneziaWG | `.amneziaWG(AmneziaWGEndpoint(wireGuard:parameters:))`, the parameters as their `[Interface]` keys (`S1`, `H1`, …) | `privateKey`, as for WireGuard |
 | Xray | `.xrayNode(XrayNodeEndpoint(host:inbounds:))` | `uid`: the answer's client UUID |
 | V2Ray | `.v2ray(V2RayNodeEndpoint(host:inbounds:))` | `uid`, as for Xray |
