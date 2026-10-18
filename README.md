@@ -51,7 +51,7 @@ of its own, and the app links no engine at all.
 |---|---|---|
 | `DVPNSDK` | the app | The backend client: `BackendConfiguration` and one dependency client per area (`NodeCatalogClient`, `ConnectionAPIClient`, `DeviceAPIClient`, `ConfigAPIClient`, `APIEndpointClient`, `DeviceEventsClient`); the mirrors that stand in for the API when it cannot be reached; typed `APIError`s. |
 | `DVPNTunnel` | the app | `TunnelManager`: `start(from:)` connects to the node in a set of credentials, `restart()`, `stop()`, `isActive()`, `events()`. On macOS also `SplitTunnelManager`. |
-| `DVPNCoreKit` | the app and every extension | `DVPNCoreConfiguration`, the App Group paths, DNS settings. |
+| `DVPNCoreKit` | the app and every extension | `DVPNCoreConfiguration`, the App Group paths, the DNS configurations and network options. |
 | `DVPNWireGuardProvider`, `DVPNXRayProvider`, `DVPNHysteriaProvider` | one extension each | The `NEPacketTunnelProvider` base classes. |
 | `DVPNSplitTunnelProvider` | a macOS extension | `SplitTunnelProxyProvider`, a transparent proxy that lets chosen apps bypass the VPN. |
 | `DVPNSplitTunnelCore` | the macOS app | The split-tunnel setting, shared with that extension. |
@@ -168,11 +168,44 @@ try await tunnels.start(from: credentials)
 > credential calls: the Xray extension serves `.xray` and `.v2ray`, the WireGuard extension `.wireguard` and
 > `.amneziawg`, the Hysteria extension `.hysteria`.
 
-`settings` supplies the DNS servers and whether Xray fragments its TLS ClientHello.
+`settings` supplies the DNS resolvers and whether Xray fragments its TLS ClientHello.
 `TunnelManager` reads both when a tunnel starts. To apply a change to either, call `restart()`: it starts the tunnel
 again on the same node from the configuration the last start stored, with no new credentials. It throws
 `TunnelsServiceError.noStoredConfiguration`, leaving the tunnel as it is, when nothing is stored (tvOS may purge it);
 start from new credentials then.
+
+#### DNS: presets, filtering and DNS over HTTPS
+
+`settings.dnsConfiguration` names the tunnel's resolvers: servers and, optionally, the DNS-over-HTTPS endpoint they
+serve. With a DoH URL the system asks every query over HTTPS (`NEDNSOverHTTPSSettings`), so the node the tunnel goes
+through sees neither the names looked up nor the answers; without one the servers answer plain DNS, inside the tunnel.
+Every engine applies it alike. An app that implements only `selectedDNS` keeps that provider's servers in plain DNS,
+as before.
+
+| Preset | Filtering | DoH endpoint |
+|---|---|---|
+| `.cloudflare` | none | `https://cloudflare-dns.com/dns-query` |
+| `.cloudflareMalwareBlocking` | malware (1.1.1.1 for Families) | `https://security.cloudflare-dns.com/dns-query` |
+| `.cloudflareFamily` | malware and adult content (1.1.1.1 for Families) | `https://family.cloudflare-dns.com/dns-query` |
+| `.quad9` | malware, DNSSEC validated | `https://dns.quad9.net/dns-query` |
+| `.adGuard` | ads and trackers | `https://dns.adguard-dns.com/dns-query` |
+| `.adGuardFamily` | ads, trackers and adult content, safe search | `https://family.adguard-dns.com/dns-query` |
+| `.google` | none | `https://dns.google/dns-query` |
+
+- `DNSConfiguration.presets` lists them; each has its provider's IPv4 and IPv6 addresses as its documentation gives
+  them. `.unencrypted` gives the same servers in plain DNS.
+- `DNSConfiguration.custom(servers:dohURL:)` takes an app's own: IP addresses, at least one IPv4, and an `https` DoH
+  URL or none. It returns nil otherwise.
+- A tunnel uses the IPv6 servers only when it routes IPv6 (`networkOptions.ipv6 == .tunnel`): otherwise the system
+  would reach them around the tunnel.
+- The system's failover to "the default system resolver" (`NEDNSSettings.allowFailover`) stays off, since that
+  resolver is the network's, outside the tunnel. A DoH server that does not answer means no DNS rather than plain DNS
+  outside the tunnel.
+- `DNSConfiguration` is `Codable`, and a stored `DNSServerType` decodes as one.
+- The Mullvad presets (`.mullvad`, `.mullvadAdBlock`, …) are deprecated and left out of `presets`. Mullvad's public
+  encrypted DNS ends on 2 November 2026
+  ([announcement](https://mullvad.net/en/blog/2026/9/3/shutting-down-our-public-encrypted-dns-servers-and-sponsoring-quad9-instead)),
+  and it answers DoH only.
 
 #### The kill switch and other network options
 

@@ -171,7 +171,8 @@ extension TunnelManager {
             throw .emptyCredentials
         }
 
-        Self.configureBackendNode(tunnelModel, privateKey: privateKey, endpoint: wg, dns: storage.selectedDNS.address)
+        let dnsServers = storage.dnsConfiguration.servers(includingIPv6: storage.networkOptions.ipv6 == .tunnel)
+        Self.configureBackendNode(tunnelModel, privateKey: privateKey, endpoint: wg, dns: dnsServers.joined(separator: ", "))
 
         let tunnelConfiguration: TunnelConfiguration
         switch tunnelModel.save() {
@@ -185,7 +186,7 @@ extension TunnelManager {
                 throw .addTunnelFailed(systemError: error)
             }
         }
-        return Self.configuration(tunnelConfiguration, routingIPv6: storage.networkOptions.ipv6, nodeAddresses: wg.clientAddresses)
+        return applyingSettings(to: tunnelConfiguration, nodeAddresses: wg.clientAddresses)
     }
 }
 
@@ -252,7 +253,7 @@ extension TunnelManager {
     /// Stores the source in the App Group and activates the Xray tunnel.
     func startXray(source: XraySource, descriptor: TunnelProtocolDescriptor) async throws(TunnelsServiceError) {
         let service = try await loadService()
-        TunnelConfigDirectories.storeDNS(storage.selectedDNS)
+        TunnelConfigDirectories.storeDNS(storage.dnsConfiguration)
         TunnelConfigDirectories.storeNetwork(NetworkModel(options: storage.networkOptions))
         do {
             try XraySourceStore.save(source)

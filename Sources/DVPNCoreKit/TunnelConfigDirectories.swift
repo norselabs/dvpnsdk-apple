@@ -75,10 +75,29 @@ public enum TunnelConfigDirectories {
 
 package extension TunnelConfigDirectories {
     static let dnsKey = "DNS"
+    static let dnsConfigurationKey = "DNS_CONFIGURATION"
 
-    /// Hands the app's DNS choice to the proxy extensions, which read it back with `dns(in:)`.
+    /// Hands the app's DNS choice to the proxy extensions, which read it back with `dnsConfiguration(in:)`.
     static func storeDNS(_ dns: DNSServerType, in defaults: UserDefaults = .shared) {
-        defaults.set(dns.addresses, forKey: dnsKey)
+        storeDNS(dns.configuration, in: defaults)
+    }
+
+    /// Hands the app's resolvers to the proxy extensions, which read them back with `dnsConfiguration(in:)`. The
+    /// servers alone go under `dnsKey` too, as earlier builds stored them (`dns(in:)`).
+    static func storeDNS(_ dns: DNSConfiguration, in defaults: UserDefaults = .shared) {
+        defaults.set(dns.servers, forKey: dnsKey)
+        defaults.set(try? JSONEncoder().encode(dns), forKey: dnsConfigurationKey)
+    }
+
+    /// The resolvers for a proxy tunnel: the configuration the app stored or, from a build that stored servers only,
+    /// those servers in plain DNS.
+    static func dnsConfiguration(in defaults: UserDefaults = .shared) -> DNSConfiguration {
+        if let data = defaults.data(forKey: dnsConfigurationKey),
+           let configuration = try? JSONDecoder().decode(DNSConfiguration.self, from: data)
+        {
+            return configuration
+        }
+        return DNSConfiguration(name: "stored", servers: dns(in: defaults))
     }
 
     /// The resolvers for a proxy tunnel. Older builds stored a comma-separated string, which a

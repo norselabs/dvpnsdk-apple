@@ -39,13 +39,13 @@ open class ProxyPacketTunnelProvider: NEPacketTunnelProvider {
     }
 
     open func makeNetworkSettings(network: NetworkModel) -> NEPacketTunnelNetworkSettings {
-        Self.networkSettings(network: network, mtu: mtu, dnsServers: TunnelConfigDirectories.dns())
+        Self.networkSettings(network: network, mtu: mtu, dns: TunnelConfigDirectories.dnsConfiguration())
     }
 
     /// Every IPv4 route into the tunnel and, when `network` enables IPv6, every IPv6 route too, from a unique local
     /// address: hev-socks5-tunnel hands IPv6 connections to the engine like IPv4 ones, and without IPv6 settings the
-    /// system would send IPv6 around the tunnel.
-    static func networkSettings(network: NetworkModel, mtu: Int, dnsServers: [String]) -> NEPacketTunnelNetworkSettings {
+    /// system would send IPv6 around the tunnel. DNS over HTTPS when `dns` has a DoH URL, plain DNS otherwise.
+    static func networkSettings(network: NetworkModel, mtu: Int, dns: DNSConfiguration) -> NEPacketTunnelNetworkSettings {
         let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "254.1.1.1")
         settings.mtu = NSNumber(value: mtu)
         settings.ipv4Settings = {
@@ -67,7 +67,7 @@ open class ProxyPacketTunnelProvider: NEPacketTunnelProvider {
             }
             return settings
         }()
-        settings.dnsSettings = NEDNSSettings(servers: dnsServers)
+        settings.dnsSettings = dns.dnsSettings(includingIPv6: network.ipv6Enabled)
         return settings
     }
 

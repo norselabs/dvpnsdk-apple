@@ -46,6 +46,37 @@ struct TunnelConfigDirectoriesTests {
         #expect(TunnelConfigDirectories.dns(in: defaults) == ["1.1.1.1", "1.0.0.1"])
     }
 
+    @Test(arguments: DNSConfiguration.presets + [DNSConfiguration.quad9.unencrypted])
+    func aStoredConfigurationIsReadBack(_ configuration: DNSConfiguration) {
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        TunnelConfigDirectories.storeDNS(configuration, in: defaults)
+
+        #expect(TunnelConfigDirectories.dnsConfiguration(in: defaults) == configuration)
+        #expect(TunnelConfigDirectories.dns(in: defaults) == configuration.servers, "the servers alone, as earlier builds read them")
+    }
+
+    @Test(arguments: DNSServerType.allCases)
+    func aStoredProviderIsReadBackAsItsConfiguration(_ provider: DNSServerType) {
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        TunnelConfigDirectories.storeDNS(provider, in: defaults)
+
+        #expect(TunnelConfigDirectories.dnsConfiguration(in: defaults) == provider.configuration)
+    }
+
+    /// What an earlier build stored, the servers alone, is read as those servers in plain DNS.
+    @Test
+    func serversStoredByAnEarlierBuildArePlainDNS() {
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(["9.9.9.9", "149.112.112.112"], forKey: TunnelConfigDirectories.dnsKey)
+
+        let configuration = TunnelConfigDirectories.dnsConfiguration(in: defaults)
+        #expect(configuration.servers == ["9.9.9.9", "149.112.112.112"])
+        #expect(!configuration.isEncrypted)
+    }
+
     @Test
     func aStoredNetworkIsReadBack() {
         defer { defaults.removePersistentDomain(forName: suiteName) }

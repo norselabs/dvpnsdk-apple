@@ -47,7 +47,7 @@ extension TunnelManager {
     ) async throws(TunnelsServiceError) {
         let service = try await loadService()
 
-        TunnelConfigDirectories.storeDNS(storage.selectedDNS)
+        TunnelConfigDirectories.storeDNS(storage.dnsConfiguration)
         TunnelConfigDirectories.storeNetwork(NetworkModel(options: storage.networkOptions))
         do {
             try HysteriaConfigurationStore.save(configuration)

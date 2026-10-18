@@ -18,6 +18,15 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   (`TunnelConfigDirectories.storeNetwork`). `.unchanged`, the default, routes IPv6 as before.
 - `WireGuardEndpoint.clientAddresses`: every address the node assigned the client, its IPv6 address included; the
   decoder used to keep the first only.
+- `DNSConfiguration` and `TunnelSettingsProviding.dnsConfiguration`: a tunnel's resolvers as servers and an optional
+  DNS-over-HTTPS URL, applied through `NEDNSOverHTTPSSettings` by the WireGuard extension and the proxy providers
+  alike. Presets with each provider's IPv4 and IPv6 addresses and DoH endpoint: Cloudflare (standard, malware
+  blocking, family), Quad9, AdGuard (default, family) and Google, in `DNSConfiguration.presets`; `custom(...)` for an
+  app's own; `unencrypted` for plain DNS. IPv6 servers are used only with `ipv6: .tunnel`. The Mullvad presets are
+  deprecated already: Mullvad ends that service on 2 November 2026. `DNSServerType` stays, as
+  `DNSServerType.configuration` (its servers in plain DNS), and a stored `DNSServerType` decodes as a
+  `DNSConfiguration`. `selectedDNS` now has a default, so an app may implement `dnsConfiguration` alone.
+- WireGuardKit: `InterfaceConfiguration.dnsOverHTTPSURL`, stored as a `DNSOverHTTPS` key in the configuration text.
 
 ### Changed
 

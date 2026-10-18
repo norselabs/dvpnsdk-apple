@@ -40,7 +40,13 @@ extension DNSServerType: Codable {}
 
 /// The tunnel layer's view of the app's settings storage.
 public protocol TunnelSettingsProviding: AnyObject, Sendable {
+    /// The DNS provider, plain DNS. Only read through `dnsConfiguration`'s default: an app that implements
+    /// `dnsConfiguration` need not implement it.
     var selectedDNS: DNSServerType { get }
+    /// The tunnel's resolvers, a preset (`DNSConfiguration.presets`), `DNSConfiguration.custom(...)` or any other;
+    /// `selectedDNS.configuration` unless the app returns its own. Read when a tunnel starts; apply a change with
+    /// `restart()`.
+    var dnsConfiguration: DNSConfiguration { get }
     /// "Advanced obfuscation": split the TLS ClientHello of Xray connections (Xray-core `fragment`,
     /// see `XObfuscation`). No effect on the other engines: AmneziaWG is obfuscated by design and a
     /// Hysteria 2 node dictates its own Salamander obfuscation.
@@ -51,6 +57,8 @@ public protocol TunnelSettingsProviding: AnyObject, Sendable {
 }
 
 public extension TunnelSettingsProviding {
+    var selectedDNS: DNSServerType { .default }
+    var dnsConfiguration: DNSConfiguration { selectedDNS.configuration }
     var isObfuscationEnabled: Bool { false }
     var networkOptions: TunnelNetworkOptions { .default }
 }
