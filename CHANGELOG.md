@@ -27,6 +27,13 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   `DNSServerType.configuration` (its servers in plain DNS), and a stored `DNSServerType` decodes as a
   `DNSConfiguration`. `selectedDNS` now has a default, so an app may implement `dnsConfiguration` alone.
 - WireGuardKit: `InterfaceConfiguration.dnsOverHTTPSURL`, stored as a `DNSOverHTTPS` key in the configuration text.
+- `TunnelManager.switchNode(to:)`: moves a running tunnel to the node in new credentials. On the same engine the
+  extension changes nodes in place, keeping the tunnel interface and its routes, so traffic waits for the new node
+  instead of going around the tunnel: the WireGuard provider updates its engine (`WireGuardAdapter.update`), the Xray
+  and Hysteria providers restart their engine alone behind the same hev-socks5-tunnel. A node that does not answer, or
+  an engine that cannot start on it, leaves the tunnel up. Otherwise (the tunnel is down, another engine runs, or the
+  extension predates the message) it stops the tunnel and starts it from the credentials. The providers answer the
+  new `switchNode` app message; one built before it answers nothing, and the app falls back to the full start.
 
 ### Changed
 

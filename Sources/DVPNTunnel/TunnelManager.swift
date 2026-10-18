@@ -35,7 +35,7 @@ public final class TunnelManager {
     private var service: TunnelsService?
     private var serviceCreation: Task<TunnelsService, any Error>?
     private var eventForwarding: Task<Void, Never>?
-    private let broadcaster = EventBroadcaster<TunnelEvent>(initial: .status(.disconnected))
+    let broadcaster = EventBroadcaster<TunnelEvent>(initial: .status(.disconnected))
 
     public nonisolated init(
         settings: any TunnelSettingsProviding,
@@ -219,6 +219,11 @@ extension TunnelManager {
 extension TunnelManager {
     /// Both Xray node types end in the same typed model; each selection rule set is the node type's own.
     func startXray(from credentials: ConnectionCredentials) async throws(TunnelsServiceError) {
+        try await startXray(source: .model(xrayModel(from: credentials)), descriptor: try requiredDescriptor(for: .xray))
+    }
+
+    /// The model of an Xray or V2Ray node, with the obfuscation setting as it is now.
+    func xrayModel(from credentials: ConnectionCredentials) throws(TunnelsServiceError) -> XConfigurationModel {
         guard let uid = credentials.uid else {
             throw .emptyCredentials
         }
@@ -242,7 +247,7 @@ extension TunnelManager {
             throw .emptyCredentials
         }
         model.obfuscation = selectedObfuscation
-        try await startXray(source: .model(model), descriptor: try requiredDescriptor(for: .xray))
+        return model
     }
 
     /// The app's "Advanced obfuscation" setting, read at connect time so a toggle applies to the next connection.

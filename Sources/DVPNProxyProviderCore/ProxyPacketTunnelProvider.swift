@@ -6,6 +6,7 @@
 import DVPNCoreKit
 import NetworkExtension
 import os
+import Synchronization
 
 // MARK: - ProxyPacketTunnelProvider
 
@@ -14,9 +15,13 @@ import os
 /// The provider claims a synthetic tunnel interface, asks the subclass to start its engine so a
 /// SOCKS5 server listens on the start's `LocalProxy` (a free loopback port with random credentials), then
 /// runs hev-socks5-tunnel (`Socks5Tunnel`) to pipe the utun packets into that proxy. Subclasses override
-/// `startProxy(network:proxy:)` and `stopProxy()`.
+/// `startProxy(network:proxy:)` and `stopProxy()`. A node switch (`TunnelProviderMessage.switchNode`) stops and
+/// starts the engine alone, on the same local proxy.
 open class ProxyPacketTunnelProvider: NEPacketTunnelProvider {
     open var mtu: Int { 9000 }
+
+    /// What the running tunnel started with, which a node switch keeps; nil while it is down.
+    private let running = Mutex<RunningTunnel?>(nil)
 
     override public init() {
         super.init()
@@ -79,10 +84,12 @@ open class ProxyPacketTunnelProvider: NEPacketTunnelProvider {
         TunnelStateStore.record(isUp: true, server: nodeHost)
 
         do {
+            let dns = TunnelConfigDirectories.dnsConfiguration()
             try await setTunnelNetworkSettings(makeNetworkSettings(network: network))
             let proxy = try LocalProxy.random()
             try await startProxy(network: network, proxy: proxy)
             try startSocks5Tunnel(proxy: proxy)
+            running.withLock { $0 = RunningTunnel(network: network, proxy: proxy, dns: dns) }
         } catch {
             logger.error("starting tunnel failed due to: \(error, privacy: .public)")
             // Only the error text is recorded, never the configuration.
@@ -95,10 +102,64 @@ open class ProxyPacketTunnelProvider: NEPacketTunnelProvider {
 
     override open nonisolated(nonsending) func stopTunnel(with reason: NEProviderStopReason) async {
         logger.error("tunnel is stopped due to: \(Self.describe(reason), privacy: .public)")
+        running.withLock { $0 = nil }
         TunnelStateStore.record(isUp: false)
         stopProxy()
         ExtensionLogFile.dump()
     }
+
+    override open nonisolated(nonsending) func handleAppMessage(_ messageData: Data) async -> Data? {
+        guard TunnelProviderMessage(messageData) == .switchNode else { return nil }
+        return await switchNode().data
+    }
+
+    /// Restarts the engine alone on the configuration the app stored: the tunnel interface, its routes and
+    /// hev-socks5-tunnel stay, and the engine listens on the same local proxy again, so until it does, connections into
+    /// the tunnel fail inside it instead of going around it. A DNS change the app stored with the node applies too; the
+    /// routes, IPv6 included, stay as the tunnel started. When the engine cannot start on the new node, the tunnel stays
+    /// up without one, carrying nothing, until the app switches again or stops it.
+    nonisolated(nonsending) func switchNode() async -> NodeSwitchReply {
+        let tunnel: RunningTunnel? = running.withLock { state in
+            guard let current = state, !current.isSwitching else { return nil }
+            state?.isSwitching = true
+            return current
+        }
+        guard let tunnel else {
+            logger.error("Switching node refused: the tunnel is not running, or is switching already")
+            return .failed("The tunnel is not running, or is switching nodes already")
+        }
+        defer { running.withLock { $0?.isSwitching = false } }
+
+        reasserting = true
+        defer { reasserting = false }
+        stopProxy()
+        TunnelStateStore.record(isUp: true, server: nodeHost)
+        do {
+            let dns = TunnelConfigDirectories.dnsConfiguration()
+            if dns != tunnel.dns {
+                try await setTunnelNetworkSettings(makeNetworkSettings(network: tunnel.network))
+                running.withLock { $0?.dns = dns }
+            }
+            try await startProxy(network: tunnel.network, proxy: tunnel.proxy)
+            logger.info("Switched node in place")
+            return .switched
+        } catch {
+            logger.error("Switching node failed: \(error, privacy: .public)")
+            ExtensionLogFile.dump()
+            return .failed(error.logDescription)
+        }
+    }
+}
+
+// MARK: - RunningTunnel
+
+/// What a node switch keeps of a running proxy tunnel: hev-socks5-tunnel goes on forwarding to `proxy`.
+struct RunningTunnel: Sendable {
+    let network: NetworkModel
+    let proxy: LocalProxy
+    /// The resolvers the tunnel's settings carry, so that a switch reapplies them only when the app changed them.
+    var dns: DNSConfiguration
+    var isSwitching = false
 }
 
 // MARK: - Internal

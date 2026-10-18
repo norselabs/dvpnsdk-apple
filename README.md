@@ -50,7 +50,7 @@ of its own, and the app links no engine at all.
 | Product | Linked by | What it holds |
 |---|---|---|
 | `DVPNSDK` | the app | The backend client: `BackendConfiguration` and one dependency client per area (`NodeCatalogClient`, `ConnectionAPIClient`, `DeviceAPIClient`, `ConfigAPIClient`, `APIEndpointClient`, `DeviceEventsClient`); the mirrors that stand in for the API when it cannot be reached; typed `APIError`s. |
-| `DVPNTunnel` | the app | `TunnelManager`: `start(from:)` connects to the node in a set of credentials, `restart()`, `stop()`, `isActive()`, `events()`. On macOS also `SplitTunnelManager`. |
+| `DVPNTunnel` | the app | `TunnelManager`: `start(from:)` connects to the node in a set of credentials, `switchNode(to:)` moves a running tunnel to another, `restart()`, `stop()`, `isActive()`, `events()`. On macOS also `SplitTunnelManager`. |
 | `DVPNCoreKit` | the app and every extension | `DVPNCoreConfiguration`, the App Group paths, the DNS configurations and network options. |
 | `DVPNWireGuardProvider`, `DVPNXRayProvider`, `DVPNHysteriaProvider` | one extension each | The `NEPacketTunnelProvider` base classes. |
 | `DVPNSplitTunnelProvider` | a macOS extension | `SplitTunnelProxyProvider`, a transparent proxy that lets chosen apps bypass the VPN. |
@@ -231,6 +231,29 @@ turn both on for a tunnel that nothing goes around.
 > version waits for a network that never comes. A restart of the device usually recovers; Mullvad found no way for an
 > app to detect or avoid it ([Why we still don't use includeAllNetworks](https://mullvad.net/en/blog/why-we-still-dont-use-includeallnetworks),
 > March 2025). Test an update with the kill switch on before you ship it on by default.
+
+#### Switching nodes
+
+`switchNode(to:)` moves a running tunnel to the node in new credentials, for a failover for one:
+
+```swift
+let replacement = try await connectionAPI.countryCredentials(country, .wireguard)
+try await tunnels.switchNode(to: replacement)
+```
+
+When the tunnel is up on the engine the credentials need (WireGuard for WireGuard and AmneziaWG nodes, Xray for Xray
+and V2Ray, Hysteria for Hysteria), the extension changes nodes in place: the tunnel interface and its routes stay up, so
+the device's traffic waits for the new node instead of going around the tunnel. The WireGuard extension updates its
+running engine with the new peer; the Xray and Hysteria extensions restart their engine alone, behind the same
+hev-socks5-tunnel. When the tunnel is down, another engine runs, or the extension was built before node switching,
+`switchNode(to:)` stops the tunnel and starts it again from the credentials, as `start(from:)` does; the system may
+route traffic around the tunnel in between. Ask for credentials of the running engine's node types to keep failover in
+place.
+
+It returns once the new node carries traffic (a WireGuard node: its first handshake). When the node does not answer
+(`.activationFailed(.handshakeTimedOut)`) or the engine cannot start on it (`.activationFailed(.startingFailed)`), the
+tunnel stays up holding the traffic: switch to another node, or `stop()`. The DNS and obfuscation settings apply as they
+are now; the network options stay as the tunnel started until `restart()`. Calls must not overlap.
 
 ### 5. Split tunnelling (macOS)
 

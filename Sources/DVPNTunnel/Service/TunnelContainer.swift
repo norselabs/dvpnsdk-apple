@@ -118,6 +118,13 @@ extension TunnelContainer {
         }
     }
 
+    /// After a WireGuard node switch: the new peer's first handshake. Unlike `readiness(timeout:)`, the wait goes on
+    /// while the tunnel is `.reasserting`, which the switch itself reports.
+    func readinessAfterNodeSwitch(timeout: Duration) async -> Readiness {
+        guard [.connected, .reasserting].contains(status) else { return .unavailable(reason: "tunnel status is \(status)") }
+        return await waitForWireGuardHandshake(timeout: timeout, whileStatusIn: [.connected, .reasserting])
+    }
+
     /// Suspends until `status` becomes one of `terminal`, or `timeout` elapses (returns `nil`).
     func waitForStatus(in terminal: Set<TunnelStatus>, timeout: Duration) async -> TunnelStatus? {
         if terminal.contains(status) { return status }
@@ -213,7 +220,8 @@ extension TunnelContainer {
 // MARK: - Private methods
 
 private extension TunnelContainer {
-    func waitForWireGuardHandshake(timeout: Duration) async -> Readiness {
+    /// Polls the handshake until `timeout`, as long as the status stays in `statuses`.
+    func waitForWireGuardHandshake(timeout: Duration, whileStatusIn statuses: Set<TunnelStatus> = [.connected]) async -> Readiness {
         let hasTimeLeft = clock.timeLeft(for: timeout)
         var observedPending = false
         var lastReason = "never asked"
@@ -230,7 +238,7 @@ private extension TunnelContainer {
                 lastReason = reason
             }
             try? await clock.sleep(for: .milliseconds(500))
-            guard status == .connected else { return .unavailable(reason: "tunnel status is \(status)") }
+            guard statuses.contains(status) else { return .unavailable(reason: "tunnel status is \(status)") }
         }
         if observedPending {
             logger.warning("WireGuard handshake not observed within \(timeout) for '\(self.name, privacy: .public)'")

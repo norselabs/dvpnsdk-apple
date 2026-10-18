@@ -37,8 +37,13 @@ final class FakeTunnelProfile: TunnelProfile {
     /// One outcome per attempt; the last one repeats.
     var startOutcomes: [StartOutcome] = [.connect]
     var saveError: (any Error)?
-    /// The provider's answer to a message: for WireGuard, its runtime configuration.
+    /// The provider's answer to the runtime-configuration message (`[0]`): for WireGuard, its runtime configuration.
     var messageAnswer: Data?
+    /// The provider's answers to other messages; one it has none for gets nil, as from a provider that does not know it.
+    var messageAnswers: [Data: Data] = [:]
+    /// Runs when the provider gets a message, before it answers (the reasserting a node switch reports, for instance).
+    var onMessage: ((Data) -> Void)?
+    private(set) var messages: [Data] = []
     /// Runs when a start attempt begins, before its outcome (the extension recording why it failed, for instance).
     var onStart: (() -> Void)?
     var onStatusChange: ((FakeTunnelProfile) -> Void)?
@@ -97,7 +102,10 @@ final class FakeTunnelProfile: TunnelProfile {
     }
 
     func sendProviderMessage(_ message: Data) async throws -> Data? {
-        messageAnswer
+        messages.append(message)
+        onMessage?(message)
+        if let answer = messageAnswers[message] { return answer }
+        return message == Data([0]) ? messageAnswer : nil
     }
 
     func report(_ status: NEVPNStatus) {
