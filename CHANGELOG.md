@@ -5,6 +5,14 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ## Unreleased
 
+### Added
+
+- `TunnelNetworkOptions`, returned by `TunnelSettingsProviding.networkOptions` (`.default` unless an app returns its
+  own): the kill switch (`includeAllNetworks`), local networks (`excludeLocalNetworks`) and enforced routes
+  (`enforceRoutes`), on every engine's profile alike. They apply when the profile is saved, so a running tunnel needs a
+  `restart()`. The default leaves each profile as before: WireGuard's with the system's default for local networks,
+  Xray's and Hysteria's excluding them.
+
 ### Changed
 
 - The split-tunnel proxy's warning about a flow with no physical interface no longer names the app; a debug line,
@@ -26,6 +34,11 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   stopped being `LocalizedError`s.
 - `WireGuardAdapter.start` builds without the "'weak' ownership of capture 'self'" warning that recent Swift
   compilers give in every app that builds the package.
+- An app that declares no WireGuard extension no longer traps when `TunnelManager` loads its tunnels. WireGuard and
+  AmneziaWG credentials then fail at `start(from:)` with `TunnelsServiceError.unsupportedProtocol`, as the other
+  engines' do, and `NETunnelProviderProtocol(tunnelConfiguration:)` returns nil instead of trapping.
+- A WireGuard start rewrites a profile that still points at a proxy engine's extension even when the WireGuard
+  configuration is the one stored before; it used to keep the proxy's extension.
 
 ## 0.3.0 (2026-10-13)
 

@@ -17,13 +17,20 @@ public enum PacketTunnelProviderError: String, Error, Sendable {
 }
 
 public extension NETunnelProviderProtocol {
+    /// The WireGuard extension's protocol for `tunnelConfiguration`, which it stores in the App Group, routing as
+    /// `networkOptions` say (the system's defaults for local networks when they leave it open). nil when the
+    /// configuration has no name or the app declares no WireGuard extension, or when it cannot be stored.
     convenience init?(
         tunnelConfiguration: TunnelConfiguration,
-        previouslyFrom old: NEVPNProtocol? = nil
+        previouslyFrom old: NEVPNProtocol? = nil,
+        networkOptions: TunnelNetworkOptions = .default
     ) {
         self.init()
-        guard let name = tunnelConfiguration.name else { return nil }
-        providerBundleIdentifier = TunnelEnvironment.requiredConfiguration.requiredDescriptor(for: .wireGuard).providerBundleID
+        guard let name = tunnelConfiguration.name,
+              let descriptor = TunnelEnvironment.requiredConfiguration.descriptor(for: .wireGuard)
+        else { return nil }
+        providerBundleIdentifier = descriptor.providerBundleID
+        apply(networkOptions)
 
         // Use file-based storage (no keychain)
         do {
