@@ -21,6 +21,9 @@ struct SNISpoofTransport: Sendable {
     }
 
     let timeout: TimeInterval
+    /// Watches an API request's send, as `MirroredTransport.load` does: a send it stopped first is not sent, and one it
+    /// stops on the way ends with a `CancellationError`.
+    var progress: RequestProgress?
 
     func send(
         _ request: URLRequest,
@@ -30,16 +33,18 @@ struct SNISpoofTransport: Sendable {
     ) async throws -> (Data, HTTPURLResponse) {
         guard let url = request.url else { throw TransportError.missingURL }
         try Task.checkCancellation()
+        if progress?.isCancelled == true { throw CancellationError() }
 
         let parameters = makeParameters(sni: sni, rootCAPublicKeys: rootCAPublicKeys)
         let host = NWEndpoint.Host(ip)
         let port: NWEndpoint.Port = .init(integerLiteral: 443)
         let connection = NWConnection(host: host, port: port, using: parameters)
+        progress?.attach { connection.cancel() }
 
         let queue = DispatchQueue(label: "dvpnsdk.sni-spoof.\(UUID().uuidString)")
 
         // A cancelled caller cancels the connection, which ends the connect, send or receive it waits on, and gets a
-        // `CancellationError`, not a transport failure that would drop a working mirror.
+        // `CancellationError`, not a transport failure that would drop a working mirror; so does a stopped send.
         let raw: Data
         do {
             raw = try await withTaskCancellationHandler {
@@ -48,7 +53,7 @@ struct SNISpoofTransport: Sendable {
                 connection.cancel()
             }
         } catch {
-            if Task.isCancelled { throw CancellationError() }
+            if Task.isCancelled || progress?.isCancelled == true { throw CancellationError() }
             throw error
         }
 
@@ -232,6 +237,8 @@ private extension SNISpoofTransport {
         // swiftlint:disable:next no_gcd
         queue.asyncAfter(deadline: .now() + timeout) { connection.cancel() }
 
+        // A body leaves with the request's one write; a GET starts with its answer, as URLSession counts them.
+        if request.httpBody?.isEmpty == false { progress?.markStarted() }
         try await sendAll(connection, data: encode(request: request, url: url, sni: sni))
         return try await receiveAll(connection)
     }
@@ -282,7 +289,10 @@ private extension SNISpoofTransport {
                     continuation.resume(returning: (data, isComplete))
                 }
             }
-            if let data = chunk.0 { buffer.append(data) }
+            if let data = chunk.0, !data.isEmpty {
+                buffer.append(data)
+                progress?.markStarted()
+            }
             if chunk.1 { break }
         }
         return buffer

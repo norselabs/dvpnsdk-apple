@@ -5,10 +5,11 @@
 
 @testable import DVPNSDK
 import Foundation
+import Synchronization
 import Testing
 
-/// `RequestProgress` over real connections to a loopback server: URLSession reports a body sent or an answer begun only
-/// over one.
+/// `RequestProgress` over real connections to a loopback server, as URLSession reports a body sent or an answer begun
+/// only over one, and its stop.
 @Suite(.timeLimit(.minutes(1)))
 struct RequestProgressTests {
     /// A server that took the request's body, or began its answer, has started on the request.
@@ -41,6 +42,47 @@ struct RequestProgressTests {
 
         try await eventually { server.requestCount == 1 }
         #expect(!progress.hasStarted)
+    }
+
+    /// A stop stops the send's connection, also one attached after it.
+    @Test
+    func aStopStopsTheSendsConnection() {
+        let progress = RequestProgress()
+        let stopped = Mutex(0)
+        progress.attach { stopped.withLock { $0 += 1 } }
+        #expect(!progress.isCancelled)
+
+        progress.cancel()
+        #expect(progress.isCancelled)
+        #expect(stopped.withLock { $0 } == 1)
+        progress.attach { stopped.withLock { $0 += 1 } }
+        #expect(stopped.withLock { $0 } == 2)
+    }
+
+    /// A start the send marks itself, as an SNI mirror's does, counts.
+    @Test
+    func aMarkedStartCounts() {
+        let progress = RequestProgress()
+        #expect(!progress.hasStarted)
+        progress.markStarted()
+        #expect(progress.hasStarted)
+    }
+
+    /// A send stopped before it began is sent nothing: it ends at once, and the server never sees it.
+    @Test
+    func aSendStoppedBeforeItBeganIsNeverSent() async throws {
+        let server = try LoopbackServer()
+        let url = try await server.start()
+        defer { server.stop() }
+        let progress = RequestProgress()
+        progress.cancel()
+
+        await #expect(throws: CancellationError.self) {
+            try await MirroredTransport.load(URLRequest(url: url), sentToken: nil, on: URLSession(configuration: .ephemeral), progress: progress)
+        }
+        // Time for a request to arrive, had one been sent.
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(server.requestCount == 0)
     }
 
     private func send(method: String, body: Data?, to url: URL, watchedBy progress: RequestProgress) -> Task<Void, any Error> {

@@ -90,7 +90,7 @@ actor MirrorResolver {
     }
 
     /// A mirror answered for a primary that failed hard or stayed silent: later requests go to the mirror until the
-    /// next refresh.
+    /// next refresh, or until the primary answers for it (`primaryAnswered()`).
     func mirrorAnswered() {
         preferMirror = true
     }
@@ -98,6 +98,13 @@ actor MirrorResolver {
     /// No mirror answered: requests go to the primary, the only route left.
     func noMirrorAnswered() {
         preferMirror = false
+    }
+
+    /// The primary answered for a preferred mirror that stayed silent: requests go to the primary, and a mirror is
+    /// looked up afresh when one is needed again.
+    func primaryAnswered() {
+        preferMirror = false
+        cached = nil
     }
 
     /// The primary answers its health check: everything about mirrors is forgotten, and requests go to the primary.
@@ -108,10 +115,14 @@ actor MirrorResolver {
         preferMirror = false
     }
 
-    /// The primary does not answer: requests prefer a mirror, resolved afresh now.
+    /// The primary does not answer: requests prefer a mirror, resolved afresh now. When none is found they stay with the
+    /// primary, the only route left, which hands a request to a mirror that comes back if it stays silent itself. A
+    /// refresh cut short says nothing either way, and a mirror another request found meanwhile stays preferred.
     func primaryIsDown() async {
         preferMirror = true
-        await refresh()
+        if await refresh() == nil, !Task.isCancelled, cached == nil {
+            preferMirror = false
+        }
     }
 
     /// Forgets the resolved mirror, the list and the failed routes, and resolves again.

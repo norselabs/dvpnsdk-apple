@@ -14,8 +14,9 @@ private let log = Logger.sdk(category: "http")
 /// The backend's transport: the primary first, then its mirrors. A request whose primary attempt fails hard (no answer,
 /// a TLS failure, 408 or 5xx) is retried on a mirror, and so is, when its timeout is longer, one whose primary stays
 /// silent past the configuration's `mirrorRequestTimeout` (`sendViaPrimaryThenMirror` has the rules). Later requests go
-/// to a mirror that answered until `refreshEndpoint` finds the primary again. The primary, the mirror resolution and the
-/// mirror attempts share the request's timeout.
+/// to a mirror that answered until `refreshEndpoint` finds the primary again, or until the primary answers for a mirror
+/// that stays silent as long (`sendViaMirrorThenPrimary`). The primary, the mirror resolution and the mirror attempts
+/// share the request's timeout.
 public final class MirroredTransport: APITransport, Sendable {
     private let session: URLSession
     /// Configures the throwaway session of a request whose answer depends on the network path (`/ip`).
@@ -138,14 +139,7 @@ private extension MirroredTransport {
 
         if await resolver.shouldPreferMirror() {
             log.debug("send [\(path, privacy: .public)] preferMirror=true — going straight to mirror")
-            do {
-                return try await sendViaMirror(request, headers: headers, retryOnFailure: true)
-            } catch let error where Self.isNoMirrorAnswer(error) {
-                // The primary is the only route left, and its answer or failure says more than the mirror's.
-                log.error("send [\(path, privacy: .public)] no mirror answered (\(Self.describeFailure(error), privacy: .public)) — trying primary")
-                await resolver.noMirrorAnswered()
-                return try await sendViaPrimary(request, headers: headers)
-            }
+            return try await sendViaMirrorThenPrimary(request, headers: headers, primaryFailure: primaryFailure)
         }
 
         log.debug("send [\(path, privacy: .public)] trying primary")
@@ -163,7 +157,8 @@ private extension MirroredTransport {
     /// left in that moment, so it is never sent twice. The primary keeps the whole limit when it has started (it may be
     /// answering slowly, or acting on the request), when no mirror is ready, when the request shows nothing before its
     /// answer (`canBeHandedOver`), and when the limit is no longer than that time. When the mirror's success is the
-    /// request's answer, later requests go straight to the mirror until `refreshEndpoint` finds the primary again.
+    /// request's answer, later requests go straight to the mirror until `refreshEndpoint` finds the primary again, or
+    /// the primary answers for a mirror that stays silent (`sendViaMirrorThenPrimary`).
     func sendViaPrimaryThenMirror(_ request: APIRequest, headers: [String: String], primaryFailure: PrimaryFailure) async throws -> APIResponse {
         let progress = RequestProgress()
         var attempts = Attempts(
@@ -192,7 +187,7 @@ private extension MirroredTransport {
                     if fromMirror, response.isSuccess { await resolver.mirrorAnswered() }
                     return response
                 case .lookForMirror:
-                    group.addTask { await .mirrorReady((try? resolver.currentMirror()) != nil) }
+                    group.addTask { await .mirrorReady(try? resolver.currentMirror()) }
                 case .askMirror:
                     group.addTask { await self.mirrorEvent(request, headers: headers) }
                 case .cancelPrimary:
@@ -207,7 +202,7 @@ private extension MirroredTransport {
     }
 
     /// The primary's answer to `request`, or why there is none.
-    func primaryEvent(_ request: APIRequest, headers: [String: String], progress: RequestProgress) async -> Event {
+    func primaryEvent(_ request: APIRequest, headers: [String: String], progress: RequestProgress? = nil) async -> Event {
         do {
             return try await .primary(.success(sendViaPrimary(request, headers: headers, progress: progress)))
         } catch {
@@ -223,6 +218,76 @@ private extension MirroredTransport {
             return .mirror(.failure(error))
         }
     }
+
+    /// The answer of mirror `route` to `request`, or why there is none; `progress` watches the send.
+    func mirrorEvent(_ request: APIRequest, headers: [String: String], route: MirrorResolver.Resolved, progress: RequestProgress) async -> Event {
+        do {
+            return try await .mirror(.success(send(request, headers: headers, to: route, progress: progress)))
+        } catch {
+            return .mirror(.failure(error))
+        }
+    }
+}
+
+// MARK: - Mirror, then primary
+
+private extension MirroredTransport {
+    /// Sends `request` to the preferred mirror, then to the primary when no mirror is found or answers, or when the
+    /// mirror stays silent: the reverse of `sendViaPrimaryThenMirror`, by its rules. A mirror that has not started on
+    /// the request (`RequestProgress`) within `mirrorRequestTimeout`, still being looked up or with a send that has
+    /// neither taken the body nor begun answering, gives it up: a GET goes to the primary too and the first answer
+    /// wins; a request with a body goes to the primary once no mirror can be acting on it (a send under way is stopped
+    /// first, and ends the request as a timeout if its body left in that moment), and back to a mirror found later only
+    /// if the primary fails before taking it. The mirror keeps the whole limit when it has started, when the request
+    /// shows nothing before its answer, and when the limit is no longer than that time. A mirror that fails hard gives
+    /// way to one more. When the primary's success is the request's answer, or no mirror answers, later requests go to
+    /// the primary.
+    func sendViaMirrorThenPrimary(_ request: APIRequest, headers: [String: String], primaryFailure: PrimaryFailure) async throws -> APIResponse {
+        var attempts = MirrorFirstAttempts(request: request, silence: configuration.mirrorRequestTimeout, primaryFailure: primaryFailure)
+        let silenceEnds = clock.sleep(endingIn: .seconds(attempts.silence))
+        let resolver = resolver
+        return try await withThrowingTaskGroup(of: Event.self) { group in
+            group.addTask { await .mirrorReady(try? resolver.currentMirror()) }
+            if attempts.canHandOver {
+                group.addTask {
+                    // Cut short only when the request is cancelled, which the loop then ends.
+                    try? await silenceEnds()
+                    return .silent
+                }
+            }
+            defer { group.cancelAll() }
+            var hasLeftTheMirrors = false
+            while let event = try await group.next() {
+                // A cancelled request asks no other endpoint: it ends now, whatever its attempts were doing.
+                try Task.checkCancellation()
+                let step = try attempts.step(after: event)
+                if attempts.hasFoundNoMirror, !hasLeftTheMirrors {
+                    hasLeftTheMirrors = true
+                    await resolver.noMirrorAnswered()
+                }
+                switch step {
+                case let .answer(response, fromMirror):
+                    if !fromMirror, response.isSuccess { await resolver.primaryAnswered() }
+                    return response
+                case let .lookForMirror(dropping):
+                    if let dropping { await resolver.invalidate(dropping) }
+                    group.addTask { await .mirrorReady(try? resolver.currentMirror()) }
+                case let .askMirror(route):
+                    let progress = attempts.mirrorProgress
+                    group.addTask { await self.mirrorEvent(request, headers: headers, route: route, progress: progress) }
+                case .askPrimary:
+                    let progress = attempts.primaryProgress
+                    group.addTask { await self.primaryEvent(request, headers: headers, progress: progress) }
+                case .stopMirror:
+                    attempts.mirrorProgress.cancel()
+                case .wait:
+                    break
+                }
+            }
+            // Not reached: the mirror's attempts, and the primary's, end the loop.
+            throw primaryFailure.value ?? HardFailure.error(.unreachable(.timedOut))
+        }
+    }
 }
 
 // MARK: - Deadline
@@ -231,9 +296,10 @@ private extension MirroredTransport {
     /// Runs `operation`, a request's whole route, within the request's timeout. A `URLRequest`'s timeout only bounds the
     /// wait for the next bytes, and each mirror attempt had it in full, so a failing primary and a silent mirror added
     /// up to minutes. At the deadline the route is cancelled, and the request ends with the primary's failure when it
-    /// had one (it says more than the mirror's silence), otherwise with a timeout. The primary's own timeout is as long,
-    /// so the deadline would cancel a silent primary before its timeout could send the request on: the route hands such
-    /// a primary over to a mirror itself, earlier, where the request allows it (`sendViaPrimaryThenMirror`).
+    /// had one (it says more than the mirror's silence), otherwise with a timeout. An endpoint's own timeout is as long,
+    /// so the deadline would cancel a silent one before its timeout could send the request on: the route hands a silent
+    /// primary to a mirror itself, earlier, where the request allows it, and a silent preferred mirror to the primary
+    /// (`sendViaPrimaryThenMirror`, `sendViaMirrorThenPrimary`).
     func withinDeadline(
         of request: APIRequest,
         _ operation: @escaping @Sendable (PrimaryFailure) async throws -> APIResponse
@@ -298,21 +364,12 @@ private extension MirroredTransport {
 // MARK: - Mirror path
 
 private extension MirroredTransport {
+    /// The resolved mirror's answer to `request`, after one more mirror when `retryOnFailure` and it fails hard.
     func sendViaMirror(_ request: APIRequest, headers: [String: String], retryOnFailure: Bool) async throws -> APIResponse {
         let path = request.target.loggedPath
         let resolved = try await resolver.currentMirror()
-        log.info("sendViaMirror [\(path, privacy: .public)] mirror used")
         do {
-            switch resolved {
-            case let .regular(host):
-                let response = try await sendRegular(request, host: host, headers: headers)
-                log.info("sendViaMirror [\(path, privacy: .public)] mirror answered \(response.status)")
-                return response
-            case let .sniSpoof(ip, sni):
-                let response = try await sendSpoofed(request, ip: ip, sni: sni, headers: headers)
-                log.info("sendViaMirror [\(path, privacy: .public)] mirror answered \(response.status)")
-                return response
-            }
+            return try await send(request, headers: headers, to: resolved)
         } catch {
             if retryOnFailure, Self.isHardFailure(error) {
                 log.notice("sendViaMirror [\(path, privacy: .public)] mirror hard-failed (\(Self.describeFailure(error), privacy: .public)) — invalidating and re-resolving")
@@ -324,19 +381,44 @@ private extension MirroredTransport {
         }
     }
 
-    func sendRegular(_ request: APIRequest, host: String, headers: [String: String]) async throws -> APIResponse {
+    /// The answer of mirror `route` to `request`; `progress` watches the send.
+    func send(
+        _ request: APIRequest,
+        headers: [String: String],
+        to route: MirrorResolver.Resolved,
+        progress: RequestProgress? = nil
+    ) async throws -> APIResponse {
+        let path = request.target.loggedPath
+        log.info("sendViaMirror [\(path, privacy: .public)] mirror used")
+        let response = switch route {
+        case let .regular(host):
+            try await sendRegular(request, host: host, headers: headers, progress: progress)
+        case let .sniSpoof(ip, sni):
+            try await sendSpoofed(request, ip: ip, sni: sni, headers: headers, progress: progress)
+        }
+        log.info("sendViaMirror [\(path, privacy: .public)] mirror answered \(response.status)")
+        return response
+    }
+
+    func sendRegular(_ request: APIRequest, host: String, headers: [String: String], progress: RequestProgress?) async throws -> APIResponse {
         var urlRequest = try Self.urlRequest(for: request, on: configuration.backendURL, host: host)
         let sentToken = authorize(&urlRequest, with: headers)
-        return try await exchange(urlRequest, sentToken: sentToken, freshConnection: request.requiresFreshConnection)
+        return try await exchange(urlRequest, sentToken: sentToken, freshConnection: request.requiresFreshConnection, progress: progress)
     }
 
     /// Sent as if DNS had resolved `sni` to `ip`: the SNI name is the URL's host, so it is both the ClientHello's name
     /// and the `Host` header, as in the route's health probe.
-    func sendSpoofed(_ request: APIRequest, ip: String, sni: String, headers: [String: String]) async throws -> APIResponse {
+    func sendSpoofed(
+        _ request: APIRequest,
+        ip: String,
+        sni: String,
+        headers: [String: String],
+        progress: RequestProgress?
+    ) async throws -> APIResponse {
         var urlRequest = try Self.urlRequest(for: request, on: configuration.backendURL, host: sni)
         let sentToken = authorize(&urlRequest, with: headers)
 
-        let transport = SNISpoofTransport(timeout: request.timeoutInterval)
+        let transport = SNISpoofTransport(timeout: request.timeoutInterval, progress: progress)
         let (data, response) = try await transport.send(urlRequest, ip: ip, sni: sni, rootCAPublicKeys: configuration.rootCAPublicKeys)
         let answer = APIResponse(status: response.statusCode, body: data, sentToken: sentToken)
         // A 408 or 5xx from this mirror is worth one more mirror, as from a regular one.
@@ -369,16 +451,17 @@ private extension MirroredTransport {
 
 extension MirroredTransport {
     /// The answer, whatever its status, or why there is none: `CancellationError` for a cancelled caller (not a
-    /// failure of the backend, so no fallback) and for a silent primary cancelled for a mirror (`progress.cancel()`,
-    /// which `sendViaPrimaryThenMirror` follows up), otherwise `APIError.unreachable`. An answer or a failure another
-    /// endpoint may not share (no answer, a TLS failure, 408 or 5xx) comes wrapped in `HardFailure`. `progress` watches
-    /// the request.
+    /// failure of the backend, so no fallback) and for a silent endpoint's request handed over to the other
+    /// (`progress.cancel()`, which `sendViaPrimaryThenMirror` and `sendViaMirrorThenPrimary` follow up), otherwise
+    /// `APIError.unreachable`. An answer or a failure another endpoint may not share (no answer, a TLS failure, 408 or
+    /// 5xx) comes wrapped in `HardFailure`. `progress` watches the send, and a send it stopped first is not sent.
     static func load(
         _ urlRequest: URLRequest,
         sentToken: String?,
         on session: URLSession,
         progress: RequestProgress? = nil
     ) async throws -> APIResponse {
+        if progress?.isCancelled == true { throw CancellationError() }
         let data: Data
         let response: URLResponse
         do {

@@ -30,9 +30,11 @@ struct HTTPClientExecuteTests {
 
     private let request = APIRequest(target: Target(), timeoutInterval: 5)
 
+    /// `resolver`, when given, replaces the one built for `mirror`.
     private func makeClient(
         primary: URL = URL(string: "https://primary.test")!,
         mirror: MirrorResolver.Resolved?,
+        resolver: MirrorResolver? = nil,
         token: String? = nil,
         isReachable: @escaping @Sendable () async -> Bool = { true },
         clock: any Clock<Duration> = ContinuousClock()
@@ -40,7 +42,7 @@ struct HTTPClientExecuteTests {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [StubProtocol.self]
         // No mirror list: only `mirror`, as if a resolution had found it, is ever tried.
-        let resolver = MirrorResolver(bootstrap: MirrorsBootstrapService(urls: [], timeout: 1), resolved: mirror, probe: { _ in false })
+        let resolver = resolver ?? MirrorResolver(bootstrap: MirrorsBootstrapService(urls: [], timeout: 1), resolved: mirror, probe: { _ in false })
         let transport = MirroredTransport(
             configuration: BackendConfiguration(
                 backendURL: primary,
@@ -126,8 +128,8 @@ struct HTTPClientExecuteTests {
         #expect(await !resolver.shouldPreferMirror())
     }
 
-    /// `refreshEndpoint` prefers a mirror when the primary's ping fails, also when no mirror can be found. The
-    /// requests still reach the primary, and its failure is what the caller sees.
+    /// A preference for a mirror with no mirror to be found leaves the request to the primary, and its failure is what
+    /// the caller sees.
     @Test
     func aPreferredMirrorThatCannotBeFoundThrowsThePrimaryFailure() async {
         StubProtocol.answers = ["primary.test": .failure(URLError(.timedOut))]
@@ -411,6 +413,203 @@ struct HTTPClientExecuteTests {
     }
 }
 
+// MARK: - Silent preferred mirror
+
+extension HTTPClientExecuteTests {
+    /// A preferred mirror that never answers hands the request to the primary within the request's limit, as a silent
+    /// primary hands it to a mirror: a GET goes to the primary too, and a request with a body is stopped on the mirror
+    /// first. The primary's answer brings later requests back to it.
+    @Test(arguments: [Target(), Target(method: .post, payload: .json(["name": "value"]))])
+    func aSilentPreferredMirrorHandsTheRequestToThePrimaryWithinItsLimit(target: Target) async throws {
+        StubProtocol.answers = ["primary.test": .json(#"{"origin":"primary"}"#), "mirror.test": .hang]
+        let clock = ManualClock()
+        let (client, resolver) = await makeClient(mirror: .regular(host: "mirror.test"), clock: clock)
+        await resolver.mirrorAnswered()
+        let request = APIRequest(target: target, timeoutInterval: 60)
+
+        let execution = Task { try await client.execute(request, as: Answer.self) }
+        try await eventually { StubProtocol.requestedHosts == ["mirror.test"] }
+        clock.advance(by: .seconds(59))
+        // A request that was never handed over ends only at the deadline.
+        if (try? await eventually { StubProtocol.requestedHosts.contains("primary.test") }) == nil {
+            clock.advance(by: .seconds(1))
+        }
+
+        #expect(StubProtocol.requestedHosts == ["mirror.test", "primary.test"])
+        #expect(try await execution.value == Answer(origin: "primary"))
+        #expect(await !resolver.shouldPreferMirror())
+        // A body leaves the mirror before the primary has it; a GET's mirror still runs as the primary is asked.
+        let order = target.method == .get ? ["mirror.test", "primary.test"] : ["mirror.test", "stop mirror.test", "primary.test"]
+        #expect(Array(StubProtocol.journal.prefix(order.count)) == order)
+    }
+
+    /// A preferred mirror still being looked up, its probes never ending, gives the request to the primary in the same
+    /// way.
+    @Test(arguments: [Target(), Target(method: .post, payload: .json(["name": "value"]))])
+    func aPreferredMirrorStillLookedUpHandsTheRequestToThePrimary(target: Target) async throws {
+        StubProtocol.answers = ["primary.test": .json(#"{"origin":"primary"}"#), "mirror.test": .json(#"{"origin":"mirror"}"#)]
+        let lookup = SlowLookup()
+        let resolver = await lookup.resolver()
+        let clock = ManualClock()
+        let (client, _) = await makeClient(mirror: nil, resolver: resolver, clock: clock)
+        let request = APIRequest(target: target, timeoutInterval: 60)
+
+        let execution = Task { try await client.execute(request, as: Answer.self) }
+        try await eventually { lookup.hasStarted }
+        clock.advance(by: .seconds(59))
+        if (try? await eventually { StubProtocol.requestedHosts.contains("primary.test") }) == nil {
+            clock.advance(by: .seconds(1))
+        }
+
+        #expect(try await execution.value == Answer(origin: "primary"))
+        #expect(StubProtocol.requestedHosts == ["primary.test"])
+        #expect(await !resolver.shouldPreferMirror())
+    }
+
+    /// A GET whose mirror answers first, after the primary was asked too, ends with the mirror's answer, and later
+    /// requests stay with the mirror.
+    @Test
+    func aMirrorThatAnswersBeforeThePrimaryKeepsThePreference() async throws {
+        StubProtocol.answers = ["primary.test": .hang, "mirror.test": .hang]
+        let clock = ManualClock()
+        let (client, resolver) = await makeClient(mirror: .regular(host: "mirror.test"), clock: clock)
+        await resolver.mirrorAnswered()
+        let request = APIRequest(target: Target(), timeoutInterval: 60)
+
+        let execution = Task { try await client.execute(request, as: Answer.self) }
+        try await eventually { StubProtocol.requestedHosts == ["mirror.test"] }
+        clock.advance(by: .seconds(59))
+        try await eventually { StubProtocol.requestedHosts.contains("primary.test") }
+        try await StubProtocol.answerHanging(on: "mirror.test", with: .json(#"{"origin":"mirror"}"#))
+
+        #expect(try await execution.value == Answer(origin: "mirror"))
+        #expect(await resolver.shouldPreferMirror())
+    }
+
+    /// A request that shows nothing before its answer (no body, and not a GET) stays with a silent preferred mirror,
+    /// which may be acting on it, and ends at its deadline.
+    @Test
+    func aRequestThePreferredMirrorMayBeActingOnStaysWithIt() async throws {
+        StubProtocol.answers = ["primary.test": .json(#"{"origin":"primary"}"#), "mirror.test": .hang]
+        let clock = ManualClock()
+        let (client, resolver) = await makeClient(mirror: .regular(host: "mirror.test"), clock: clock)
+        await resolver.mirrorAnswered()
+        let request = APIRequest(target: Target(method: .post), timeoutInterval: 60)
+
+        let execution = Task { try await client.execute(request, as: Answer.self) }
+        try await eventually { StubProtocol.requestedHosts == ["mirror.test"] }
+        clock.advance(by: .seconds(59))
+        // Time for a wrong handover to show, once the silence is over and only the deadline sleeps.
+        try await eventually { clock.sleepers == 1 }
+        try await Task.sleep(for: .milliseconds(100))
+        clock.advance(by: .seconds(1))
+
+        await #expect(throws: APIError.unreachable(.timedOut)) { try await execution.value }
+        #expect(StubProtocol.requestedHosts == ["mirror.test"])
+    }
+
+    /// A preferred mirror that took the request's body may be acting on it: the request never goes to the primary too,
+    /// and ends as a timeout. A body leaves only over a real connection, so the mirror is a loopback server, which the
+    /// primary's address reaches with the mirror's host on the same port.
+    @Test
+    func aMirrorThatTookTheBodyNeverHasTheRequestSentTwice() async throws {
+        let server = try LoopbackServer()
+        let loopback = try await server.start()
+        defer { server.stop() }
+        StubProtocol.answers = ["primary.test": .json(#"{"origin":"primary"}"#)]
+        let clock = ManualClock()
+        let primary = try #require(URL(string: "http://primary.test:\(loopback.port ?? 0)"))
+        let (client, resolver) = await makeClient(primary: primary, mirror: .regular(host: LoopbackServer.host), clock: clock)
+        await resolver.mirrorAnswered()
+        let request = APIRequest(target: Target(method: .post, payload: .json(["name": "value"])), timeoutInterval: 60)
+
+        let execution = Task { try await client.execute(request, as: Answer.self) }
+        try await eventually { server.requestCount == 1 }
+        clock.advance(by: .seconds(59))
+        // Time for a wrong handover to show, once the silence is over and only the deadline sleeps.
+        try await eventually { clock.sleepers == 1 }
+        try await Task.sleep(for: .milliseconds(100))
+        clock.advance(by: .seconds(1))
+
+        await #expect(throws: APIError.unreachable(.timedOut)) { try await execution.value }
+        #expect(StubProtocol.requestedHosts.isEmpty)
+    }
+
+    /// A request with a body handed to the primary while its mirror was still being looked up goes to the mirror found
+    /// later if the primary fails before taking it: the mirror never had it.
+    @Test
+    func aBodyThePrimaryFailedToTakeGoesToAMirrorFoundLater() async throws {
+        StubProtocol.answers = ["primary.test": .failure(URLError(.cannotConnectToHost)), "mirror.test": .json(#"{"origin":"mirror"}"#)]
+        let lookup = SlowLookup()
+        let clock = ManualClock()
+        let (client, _) = await makeClient(mirror: nil, resolver: lookup.resolver(), clock: clock)
+        let request = APIRequest(target: Target(method: .post, payload: .json(["name": "value"])), timeoutInterval: 60)
+
+        let execution = Task { try await client.execute(request, as: Answer.self) }
+        try await eventually { lookup.hasStarted }
+        clock.advance(by: .seconds(59))
+        try await eventually { StubProtocol.requestedHosts == ["primary.test"] }
+        lookup.find()
+
+        #expect(try await execution.value == Answer(origin: "mirror"))
+        #expect(StubProtocol.requestedHosts == ["primary.test", "mirror.test"])
+    }
+
+    /// A mirror found while the primary has the request's body waits: the request goes to one endpoint at a time, and
+    /// the primary's answer ends it.
+    @Test
+    func aMirrorFoundWhileThePrimaryHasTheBodyWaits() async throws {
+        StubProtocol.answers = ["primary.test": .hang, "mirror.test": .json(#"{"origin":"mirror"}"#)]
+        let lookup = SlowLookup()
+        let clock = ManualClock()
+        let (client, _) = await makeClient(mirror: nil, resolver: lookup.resolver(), clock: clock)
+        let request = APIRequest(target: Target(method: .post, payload: .json(["name": "value"])), timeoutInterval: 60)
+
+        let execution = Task { try await client.execute(request, as: Answer.self) }
+        try await eventually { lookup.hasStarted }
+        clock.advance(by: .seconds(59))
+        try await eventually { StubProtocol.requestedHosts == ["primary.test"] }
+        lookup.find()
+        // Time for a wrong send to the mirror to show.
+        try await Task.sleep(for: .milliseconds(100))
+        try await StubProtocol.answerHanging(on: "primary.test", with: .json(#"{"origin":"primary"}"#))
+
+        #expect(try await execution.value == Answer(origin: "primary"))
+        #expect(StubProtocol.requestedHosts == ["primary.test"])
+    }
+}
+
+/// A preferred mirror's lookup that lasts until the test lets it find `mirror.test`: the search's own 30 s run on the
+/// real clock, so only the request's time passes in a test.
+private final class SlowLookup: Sendable {
+    private let started = Mutex(false)
+    private let found = AsyncStream.makeStream(of: Void.self)
+
+    var hasStarted: Bool { started.withLock { $0 } }
+
+    /// A resolver that prefers a mirror and looks it up here.
+    func resolver() async -> MirrorResolver {
+        let resolver = MirrorResolver(
+            bootstrap: MirrorsBootstrapService(urls: [], timeout: 1),
+            mirrors: [Mirror(type: .regular, endpoint: "mirror.test", availableSniOptions: nil)]
+        ) { _ in await self.probe() }
+        await resolver.mirrorAnswered()
+        return resolver
+    }
+
+    func find() {
+        found.continuation.yield()
+    }
+
+    private func probe() async -> Bool {
+        started.withLock { $0 = true }
+        for await _ in found.stream {
+            return true
+        }
+        return false
+    }
+}
+
 /// The first event `events` holds, or nil when none comes within `limit`. `execute` publishes before it throws, so an
 /// event that was published is there at once.
 private func firstEvent(of events: AsyncStream<DeviceEvent>, within limit: Duration = .milliseconds(200)) async -> DeviceEvent? {
@@ -448,6 +647,7 @@ private final class StubProtocol: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var answers: [String: Answer] = [:] {
         didSet {
             requestedHosts = []
+            events.withLock { $0 = [] }
             hangingLock.withLock { hanging = [] }
         }
     }
@@ -457,6 +657,10 @@ private final class StubProtocol: URLProtocol, @unchecked Sendable {
         get { hosts.withLock { $0 } }
         set { hosts.withLock { $0 = newValue } }
     }
+
+    /// The requests' starts and ends in order: a host as it is asked, "stop" and the host as its request ends.
+    private static let events = Mutex<[String]>([])
+    static var journal: [String] { events.withLock { $0 } }
 
     /// A request left hanging: its stub, its host, and a way to answer it. Kept under a lock, and without the stub itself,
     /// which the compiler lets neither into a `Mutex` nor be answered from a static method.
@@ -490,6 +694,7 @@ private final class StubProtocol: URLProtocol, @unchecked Sendable {
         guard task?.state == .running else { return }
         let host = request.url?.host ?? ""
         Self.hosts.withLock { $0.append(host) }
+        Self.events.withLock { $0.append(host) }
         guard let url = request.url, let answer = Self.answers[host] else {
             client?.urlProtocol(self, didFailWithError: URLError(.cannotFindHost))
             return
@@ -525,5 +730,7 @@ private final class StubProtocol: URLProtocol, @unchecked Sendable {
 
     override func stopLoading() {
         Self.hangingLock.withLock { Self.hanging.removeAll { $0.stub == ObjectIdentifier(self) } }
+        let host = request.url?.host ?? ""
+        Self.events.withLock { $0.append("stop \(host)") }
     }
 }

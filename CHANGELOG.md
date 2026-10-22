@@ -45,6 +45,12 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   and the first answer wins, and a request with a body moves to the mirror. A request without a body that is not a GET
   stays with the primary, which may already be acting on it, and so does a request whose timeout is no longer than
   `mirrorRequestTimeout`.
+- A preferred mirror that never answers gives the request back to the primary, within its timeout. Once
+  `refreshEndpoint` found the primary down, or a mirror answered for it, requests went to a mirror and left it only
+  when no mirror could be found at all, so a silent mirror, or a search for one that outlasted the request, failed
+  every request until the next refresh, whether the primary answered or not. Now a mirror that has not started on the
+  request within `mirrorRequestTimeout` hands it to the primary by the same rules the other way round, and the
+  primary's success brings later requests back to it. A refresh that finds no mirror leaves requests with the primary.
 - `SplitTunnelManager` reads its proxy configuration from the system at every call, so one removed in System
   Settings while the app runs is made again at the next call (macOS may ask to allow it again) instead of
   being started, which never connects. It still keeps the configuration it loaded last, so the system goes on

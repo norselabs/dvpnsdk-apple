@@ -269,19 +269,70 @@ struct MirrorResolverTests {
         await #expect(throws: MirrorError.bootstrapFailed) { try await resolver.currentMirror() }
     }
 
-    /// What the transport reports moves the preference: a mirror that answered for a failed primary is preferred, no
-    /// mirror answering returns to the primary, and a healthy primary forgets every mirror.
+    /// What the transport reports moves the preference: a mirror that answered for a failed primary is preferred; no
+    /// mirror answering, the primary answering for a silent mirror, and a healthy primary return to the primary. The
+    /// mirror that stayed silent is not taken again without a probe.
     @Test
     func theTransportsReportsMoveThePreference() async {
-        let resolver = MirrorResolver(bootstrap: noList, probe: { _ in true })
+        let resolver = MirrorResolver(bootstrap: noList, resolved: .regular(host: "m.test"), probe: { _ in true })
         await resolver.mirrorAnswered()
         #expect(await resolver.shouldPreferMirror())
         await resolver.noMirrorAnswered()
         #expect(await !resolver.shouldPreferMirror())
-        await resolver.primaryIsDown()
-        #expect(await resolver.shouldPreferMirror())
+        await resolver.mirrorAnswered()
         await resolver.primaryIsHealthy()
         #expect(await !resolver.shouldPreferMirror())
+
+        let silent = MirrorResolver(bootstrap: noList, resolved: .regular(host: "m.test"), probe: { _ in true })
+        await silent.mirrorAnswered()
+        await silent.primaryAnswered()
+        #expect(await !silent.shouldPreferMirror())
+        // With no list to look it up in, there is no mirror now.
+        await #expect(throws: MirrorError.bootstrapFailed) { try await silent.currentMirror() }
+    }
+
+    /// A failed health check prefers a mirror only when its search finds one. With none, no list or no healthy mirror,
+    /// requests stay with the primary, the only route left. The list comes over a real connection.
+    @Test
+    func aFailedHealthCheckPrefersAMirrorOnlyWhenItFindsOne() async throws {
+        let server = try Self.mirrorListServer()
+        let list = try await MirrorsBootstrapService(urls: [server.start()], timeout: 5)
+        defer { server.stop() }
+
+        for (bootstrap, isHealthy, prefersMirror) in [(noList, true, false), (list, false, false), (list, true, true)] {
+            let resolver = MirrorResolver(bootstrap: bootstrap, probe: { _ in isHealthy })
+            await resolver.primaryIsDown()
+            #expect(await resolver.shouldPreferMirror() == prefersMirror)
+        }
+    }
+
+    /// A health check whose mirror search is cut short says nothing about the mirrors: the preference stays.
+    @Test
+    func aHealthCheckCutShortKeepsThePreference() async throws {
+        let server = try Self.mirrorListServer()
+        let list = try await MirrorsBootstrapService(urls: [server.start()], timeout: 5)
+        defer { server.stop() }
+        let probing = Mutex(false)
+        let resolver = MirrorResolver(bootstrap: list) { _ in
+            probing.withLock { $0 = true }
+            try? await Task.sleep(for: .seconds(600))
+            return false
+        }
+
+        let check = Task { await resolver.primaryIsDown() }
+        try await eventually { probing.withLock { $0 } }
+        check.cancel()
+        await check.value
+
+        #expect(await resolver.shouldPreferMirror())
+    }
+
+    /// A server that answers a mirror list with one regular mirror, `m.test`.
+    private static func mirrorListServer() throws -> LoopbackServer {
+        let body = #"{"data":[{"type":"REGULAR","endpoint":"m.test"}]}"#
+        return try LoopbackServer(
+            answerStart: "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: \(body.utf8.count)\r\n\r\n\(body)"
+        )
     }
 }
 
