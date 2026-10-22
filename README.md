@@ -98,7 +98,7 @@ let nodeTypes: [NodeType] = [.wireguard, .amneziawg, .xray, .v2ray]   // the nod
 
 let token = try await deviceAPI.register(.iOS, appToken)   // keep it; your DeviceTokenProvider returns it
 let countries = try await nodeCatalog.countries(nodeTypes)
-let credentials = try await connectionAPI.countryCredentials(countries[0], .xray)
+let credentials = try await connectionAPI.countryCredentials(countries[0], [.xray])
 ```
 
 #### Without swift-dependencies

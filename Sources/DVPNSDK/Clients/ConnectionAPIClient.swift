@@ -9,23 +9,24 @@ import Foundation
 /// The device's public IP and its location, and the credentials of a node in a city, a country, on a server, or one
 /// the backend picks.
 ///
-/// A city, a country and the backend's pick match a single node type: the backend refuses a list there with a 404, and
-/// with none it picks a WireGuard or V2Ray node, as for the apps that predate the other types. A server takes a list, so
-/// an app that offers every node type sends them all; with none, the backend could keep to WireGuard and V2Ray.
+/// Each credentials request names the node types it is given, comma-joined in that order, and an empty list names
+/// none. With none, the backend picks a WireGuard or V2Ray node for a city, a country or its own pick, as for the apps
+/// that predate the other types. A server's request sends its list too, so an app that offers every node type sends
+/// them all there; with none, the backend could keep to WireGuard and V2Ray.
 public struct ConnectionAPIClient: Sendable {
     /// Over a new connection, so a tunnel that just came up is the one that answers.
     public var publicIP: @Sendable () async throws -> IPResponse
-    public var cityCredentials: @Sendable (_ city: City, _ nodeType: NodeType?) async throws -> ConnectionCredentials
-    public var countryCredentials: @Sendable (_ country: Country, _ nodeType: NodeType?) async throws -> ConnectionCredentials
+    public var cityCredentials: @Sendable (_ city: City, _ nodeTypes: [NodeType]) async throws -> ConnectionCredentials
+    public var countryCredentials: @Sendable (_ country: Country, _ nodeTypes: [NodeType]) async throws -> ConnectionCredentials
     public var serverCredentials: @Sendable (_ server: Server, _ nodeTypes: [NodeType]) async throws -> ConnectionCredentials
-    public var quickCredentials: @Sendable (_ nodeType: NodeType?) async throws -> ConnectionCredentials
+    public var quickCredentials: @Sendable (_ nodeTypes: [NodeType]) async throws -> ConnectionCredentials
 
     public init(
         publicIP: @escaping @Sendable () async throws -> IPResponse,
-        cityCredentials: @escaping @Sendable (_ city: City, _ nodeType: NodeType?) async throws -> ConnectionCredentials,
-        countryCredentials: @escaping @Sendable (_ country: Country, _ nodeType: NodeType?) async throws -> ConnectionCredentials,
+        cityCredentials: @escaping @Sendable (_ city: City, _ nodeTypes: [NodeType]) async throws -> ConnectionCredentials,
+        countryCredentials: @escaping @Sendable (_ country: Country, _ nodeTypes: [NodeType]) async throws -> ConnectionCredentials,
         serverCredentials: @escaping @Sendable (_ server: Server, _ nodeTypes: [NodeType]) async throws -> ConnectionCredentials,
-        quickCredentials: @escaping @Sendable (_ nodeType: NodeType?) async throws -> ConnectionCredentials
+        quickCredentials: @escaping @Sendable (_ nodeTypes: [NodeType]) async throws -> ConnectionCredentials
     ) {
         self.publicIP = publicIP
         self.cityCredentials = cityCredentials

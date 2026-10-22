@@ -61,17 +61,19 @@ struct WireRequestTests {
         #expect(sent.allSatisfy { $0.httpBody == nil && $0.timeoutInterval == 15 })
     }
 
-    /// Quick, country and city credentials send a node type or none; a server's credentials send its list for "all",
-    /// as the apps ask.
+    /// Every credentials request sends the node types given, comma-joined, and none for an empty list: quick, country
+    /// and city credentials none for "all", a server's credentials its list, as the apps ask.
     @Test
-    func credentialsSendANodeTypeOrNoneAndAServerSendsTheListForAll() async throws {
+    func credentialsSendTheNodeTypesGivenOrNone() async throws {
         let sent = try await requests { client in
             let connection = ConnectionAPIClient.live(httpClient: client)
-            _ = try? await connection.quickCredentials(nil)
-            _ = try? await connection.quickCredentials(.amneziawg)
-            _ = try? await connection.countryCredentials(Self.country, nil)
-            _ = try? await connection.cityCredentials(Self.city, nil)
-            _ = try? await connection.cityCredentials(Self.city, .v2ray)
+            _ = try? await connection.quickCredentials([])
+            _ = try? await connection.quickCredentials([.amneziawg])
+            _ = try? await connection.quickCredentials([.wireguard, .xray])
+            _ = try? await connection.countryCredentials(Self.country, [])
+            _ = try? await connection.countryCredentials(Self.country, [.v2ray, .hysteria])
+            _ = try? await connection.cityCredentials(Self.city, [])
+            _ = try? await connection.cityCredentials(Self.city, [.v2ray])
             _ = try? await connection.serverCredentials(Self.server, NodeType.allCases)
             _ = try? await connection.serverCredentials(Self.server, [.xray])
         }
@@ -79,6 +81,8 @@ struct WireRequestTests {
         #expect(sent.map(line) == [
             "POST https://backend.test/credentials",
             "POST https://backend.test/credentials",
+            "POST https://backend.test/credentials",
+            "POST https://backend.test/country/de/credentials",
             "POST https://backend.test/country/de/credentials",
             "POST https://backend.test/city/berlin/credentials",
             "POST https://backend.test/city/berlin/credentials",
@@ -88,7 +92,9 @@ struct WireRequestTests {
         #expect(try sent.map(body) == [
             [:],
             ["protocol": "AMNEZIAWG"],
+            ["protocol": "WIREGUARD,XRAY"],
             [:],
+            ["protocol": "V2RAY,HYSTERIA2"],
             [:],
             ["protocol": "V2RAY"],
             ["protocol": Self.allNodeTypes],

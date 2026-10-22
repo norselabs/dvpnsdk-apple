@@ -11,9 +11,9 @@ import Foundation
 /// `xray`, `amneziawg` and `hysteria` (wire value `HYSTERIA2`) are the newer ones. `v2ray` and `xray` are both served
 /// by the Xray-core tunnel; `amneziawg` rides on the WireGuard engine with extra parameters.
 ///
-/// "All" is an app's selection, not a node type: an app asks the lists for every node type and a credentials request
-/// for none, as each expects. The declaration order is the order a request names several node types in
-/// (`WIREGUARD,V2RAY,XRAY,AMNEZIAWG,HYSTERIA2`).
+/// "All" is an app's selection, not a node type: an app asks the lists and a server's credentials for every node type,
+/// and a city's, a country's or the quick credentials for none, as each expects. The declaration order is the order a
+/// request names several node types in (`WIREGUARD,V2RAY,XRAY,AMNEZIAWG,HYSTERIA2`).
 public enum NodeType: String, Sendable, Codable, CaseIterable {
     case wireguard = "WIREGUARD"
     case v2ray = "V2RAY"
@@ -39,10 +39,6 @@ struct CredentialsBody: Sendable {
 
     init(_ nodeTypes: [NodeType]) {
         self.nodeTypes = nodeTypes
-    }
-
-    init(_ nodeType: NodeType?) {
-        nodeTypes = nodeType.map { [$0] } ?? []
     }
 }
 
