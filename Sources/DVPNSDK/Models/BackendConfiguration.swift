@@ -24,6 +24,9 @@ public struct BackendConfiguration: Sendable {
     public var rootCAPublicKeys: [Data]
     /// Where requests read the device token they send (`x-device-token`); without one they send none.
     public var deviceTokenProvider: (any DeviceTokenProvider)?
+    /// How long a mirror list, a mirror's health check and the primary's get to answer. Also how long the primary gets
+    /// to start on a request whose timeout is longer (to begin its answer, or to take the request's body) before a
+    /// mirror may take the request over (`MirroredTransport`).
     public var mirrorRequestTimeout: TimeInterval
 
     public init(

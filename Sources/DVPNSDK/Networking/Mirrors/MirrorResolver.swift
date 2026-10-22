@@ -89,7 +89,8 @@ actor MirrorResolver {
         }
     }
 
-    /// The primary failed hard and a mirror answered: later requests go to the mirror until the next refresh.
+    /// A mirror answered for a primary that failed hard or stayed silent: later requests go to the mirror until the
+    /// next refresh.
     func mirrorAnswered() {
         preferMirror = true
     }

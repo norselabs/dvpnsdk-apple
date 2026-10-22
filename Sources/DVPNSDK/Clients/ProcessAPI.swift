@@ -132,6 +132,7 @@ public enum RequestTimeout {
     /// The IP lookup is short: the app retries it, and a tunnel that just came up answers it at once.
     public static let publicIP: TimeInterval = 3
     /// Credentials wait for the node handshake; a minute bounds how long Home can show "Creating new DVPN session…"
-    /// per attempt (a primary that times out is still retried on a mirror).
+    /// per attempt (a primary that stays silent hands the request to a mirror within that minute; one that took it
+    /// keeps the whole minute).
     public static let credentials: TimeInterval = 60
 }

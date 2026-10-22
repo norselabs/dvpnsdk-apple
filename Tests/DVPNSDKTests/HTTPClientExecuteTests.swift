@@ -13,11 +13,11 @@ import Testing
 /// errors and the device events. The stub answers by host, so the suite runs serially.
 @Suite(.serialized, .timeLimit(.minutes(1)))
 struct HTTPClientExecuteTests {
-    private struct Target: APITarget {
+    struct Target: APITarget {
         var reportsDeviceState = true
-        var method: HTTPMethod { .get }
+        var method = HTTPMethod.get
+        var payload = RequestPayload.none
         var path: String { "server" }
-        var payload: RequestPayload { .none }
     }
 
     private struct Answer: Decodable, Equatable {
@@ -28,10 +28,10 @@ struct HTTPClientExecuteTests {
         var deviceToken: DeviceToken?
     }
 
-    private let primary = URL(string: "https://primary.test")!
     private let request = APIRequest(target: Target(), timeoutInterval: 5)
 
     private func makeClient(
+        primary: URL = URL(string: "https://primary.test")!,
         mirror: MirrorResolver.Resolved?,
         token: String? = nil,
         isReachable: @escaping @Sendable () async -> Bool = { true },
@@ -56,23 +56,26 @@ struct HTTPClientExecuteTests {
 
     // MARK: Mirror fallback
 
-    @Test
-    func aPrimaryTimeoutIsAnsweredByTheMirror() async throws {
+    /// The limits: one no longer than the time a silent primary gets, and one with that time running.
+    private static let limits: [TimeInterval] = [5, 60]
+
+    @Test(arguments: limits)
+    func aPrimaryTimeoutIsAnsweredByTheMirror(limit: TimeInterval) async throws {
         StubProtocol.answers = ["primary.test": .failure(URLError(.timedOut)), "mirror.test": .json(#"{"origin":"mirror"}"#)]
         let (client, resolver) = await makeClient(mirror: .regular(host: "mirror.test"))
 
-        let answer = try await client.execute(request, as: Answer.self)
+        let answer = try await client.execute(APIRequest(target: Target(), timeoutInterval: limit), as: Answer.self)
 
         #expect(answer == Answer(origin: "mirror"))
         #expect(await resolver.shouldPreferMirror())
     }
 
-    @Test
-    func aPrimaryServerErrorIsAnsweredByTheMirror() async throws {
+    @Test(arguments: limits)
+    func aPrimaryServerErrorIsAnsweredByTheMirror(limit: TimeInterval) async throws {
         StubProtocol.answers = ["primary.test": .status(503), "mirror.test": .json(#"{"origin":"mirror"}"#)]
         let (client, _) = await makeClient(mirror: .regular(host: "mirror.test"))
 
-        #expect(try await client.execute(request, as: Answer.self) == Answer(origin: "mirror"))
+        #expect(try await client.execute(APIRequest(target: Target(), timeoutInterval: limit), as: Answer.self) == Answer(origin: "mirror"))
     }
 
     @Test
@@ -137,6 +140,111 @@ struct HTTPClientExecuteTests {
         #expect(StubProtocol.requestedHosts == ["primary.test"])
     }
 
+    // MARK: Silent primary
+
+    /// A primary that never answers hands the request to the mirror within the request's limit, before the deadline
+    /// cancels it: a GET goes to the mirror too, and a request with a body is cancelled on the primary first. The limit
+    /// is long, so URLSession's own timeout, which runs in real time, never ends the primary's attempt during the test.
+    @Test(arguments: [Target(), Target(method: .post, payload: .json(["name": "value"]))])
+    func aSilentPrimaryHandsTheRequestToTheMirrorWithinItsLimit(target: Target) async throws {
+        StubProtocol.answers = ["primary.test": .hang, "mirror.test": .json(#"{"origin":"mirror"}"#)]
+        let clock = ManualClock()
+        let (client, resolver) = await makeClient(mirror: .regular(host: "mirror.test"), clock: clock)
+        let request = APIRequest(target: target, timeoutInterval: 60)
+
+        let execution = Task { try await client.execute(request, as: Answer.self) }
+        try await eventually { StubProtocol.requestedHosts == ["primary.test"] }
+        clock.advance(by: .seconds(59))
+        // A request that was never handed over ends only at the deadline.
+        if (try? await eventually { StubProtocol.requestedHosts.contains("mirror.test") }) == nil {
+            clock.advance(by: .seconds(1))
+        }
+
+        #expect(StubProtocol.requestedHosts == ["primary.test", "mirror.test"])
+        #expect(try await execution.value == Answer(origin: "mirror"))
+        #expect(await resolver.shouldPreferMirror())
+    }
+
+    /// A GET whose primary answers first, after the mirror was asked too, ends with the primary's answer, and later
+    /// requests stay with the primary.
+    @Test
+    func aPrimaryThatAnswersBeforeTheMirrorKeepsLaterRequests() async throws {
+        StubProtocol.answers = ["primary.test": .hang, "mirror.test": .hang]
+        let clock = ManualClock()
+        let (client, resolver) = await makeClient(mirror: .regular(host: "mirror.test"), clock: clock)
+        let request = APIRequest(target: Target(), timeoutInterval: 60)
+
+        let execution = Task { try await client.execute(request, as: Answer.self) }
+        try await eventually { StubProtocol.requestedHosts == ["primary.test"] }
+        clock.advance(by: .seconds(59))
+        try await eventually { StubProtocol.requestedHosts.contains("mirror.test") }
+        try await StubProtocol.answerHanging(on: "primary.test", with: .json(#"{"origin":"primary"}"#))
+
+        #expect(try await execution.value == Answer(origin: "primary"))
+        #expect(await !resolver.shouldPreferMirror())
+    }
+
+    /// A silent primary with no mirror to take over keeps the request's whole limit, and its late answer counts.
+    @Test
+    func aSilentPrimaryWithoutAMirrorKeepsTheWholeLimit() async throws {
+        StubProtocol.answers = ["primary.test": .hang]
+        let clock = ManualClock()
+        let (client, _) = await makeClient(mirror: nil, clock: clock)
+        let request = APIRequest(target: Target(), timeoutInterval: 60)
+
+        let execution = Task { try await client.execute(request, as: Answer.self) }
+        try await eventually { StubProtocol.requestedHosts == ["primary.test"] }
+        clock.advance(by: .seconds(59))
+        try await StubProtocol.answerHanging(on: "primary.test", with: .json(#"{"origin":"primary"}"#))
+
+        #expect(try await execution.value == Answer(origin: "primary"))
+        #expect(StubProtocol.requestedHosts == ["primary.test"])
+    }
+
+    /// A request that shows nothing before its answer (no body, and not a GET) stays with a silent primary, which may be
+    /// acting on it, and ends at its deadline.
+    @Test
+    func aRequestThePrimaryMayBeActingOnIsNeverHandedOver() async throws {
+        StubProtocol.answers = ["primary.test": .hang, "mirror.test": .json(#"{"origin":"mirror"}"#)]
+        let clock = ManualClock()
+        let (client, _) = await makeClient(mirror: .regular(host: "mirror.test"), clock: clock)
+        let request = APIRequest(target: Target(method: .post), timeoutInterval: 60)
+
+        let execution = Task { try await client.execute(request, as: Answer.self) }
+        try await eventually { StubProtocol.requestedHosts == ["primary.test"] }
+        clock.advance(by: .seconds(59))
+        // Time for a wrong handover to show.
+        try await Task.sleep(for: .milliseconds(100))
+        clock.advance(by: .seconds(1))
+
+        await #expect(throws: APIError.unreachable(.timedOut)) { try await execution.value }
+        #expect(StubProtocol.requestedHosts == ["primary.test"])
+    }
+
+    /// A primary that took the request's body may be acting on it: the request never goes to the mirror too, and ends
+    /// as a timeout, whether the primary was seen to start in time or only after it was cancelled for the mirror. A body
+    /// leaves only over a real connection, so the primary is a loopback server.
+    @Test
+    func aPrimaryThatTookTheBodyNeverHasTheRequestSentTwice() async throws {
+        let server = try LoopbackServer()
+        let primary = try await server.start()
+        defer { server.stop() }
+        StubProtocol.answers = ["mirror.test": .json(#"{"origin":"mirror"}"#)]
+        let clock = ManualClock()
+        let (client, _) = await makeClient(primary: primary, mirror: .regular(host: "mirror.test"), clock: clock)
+        let request = APIRequest(target: Target(method: .post, payload: .json(["name": "value"])), timeoutInterval: 60)
+
+        let execution = Task { try await client.execute(request, as: Answer.self) }
+        try await eventually { server.requestCount == 1 }
+        clock.advance(by: .seconds(59))
+        // Time for a wrong handover to show.
+        try await Task.sleep(for: .milliseconds(100))
+        clock.advance(by: .seconds(1))
+
+        await #expect(throws: APIError.unreachable(.timedOut)) { try await execution.value }
+        #expect(StubProtocol.requestedHosts.isEmpty)
+    }
+
     // MARK: Cancellation
 
     /// The primary, the mirror resolution and the mirror attempts share the request's timeout: a primary that answers
@@ -177,12 +285,13 @@ struct HTTPClientExecuteTests {
     }
 
     /// A request whose caller gave up (the app's limit on its IP lookup) is cancelled with it and fails with
-    /// `CancellationError`: no fallback to the mirror, and no preference for it afterwards.
-    @Test
-    func aCancelledRequestNeitherFallsBackNorPrefersTheMirror() async throws {
+    /// `CancellationError`: no fallback to the mirror, and no preference for it afterwards, also while the time a silent
+    /// primary gets is running.
+    @Test(arguments: limits)
+    func aCancelledRequestNeitherFallsBackNorPrefersTheMirror(limit: TimeInterval) async throws {
         StubProtocol.answers = ["primary.test": .hang, "mirror.test": .json(#"{"origin":"mirror"}"#)]
         let (client, resolver) = await makeClient(mirror: .regular(host: "mirror.test"))
-        let task = Task { try await client.execute(request, as: Answer.self) }
+        let task = Task { try await client.execute(APIRequest(target: Target(), timeoutInterval: limit), as: Answer.self) }
         try await Task.sleep(for: .milliseconds(100))
 
         task.cancel()
@@ -322,22 +431,25 @@ private func firstEvent(of events: AsyncStream<DeviceEvent>, within limit: Durat
 
 // MARK: - Stub
 
-/// Answers every request from `answers`, keyed by host, and records the hosts asked.
-/// `@unchecked` because URLProtocol is not Sendable; the serialized suite is the only writer.
+/// Answers every request from `answers`, keyed by host, and records the hosts asked; a loopback server's requests go to
+/// it. `@unchecked` because URLProtocol is not Sendable; the serialized suite is the only writer.
 private final class StubProtocol: URLProtocol, @unchecked Sendable {
     indirect enum Answer: Sendable {
         case json(String)
         /// A status with `body`, such as the backend's `{"error": …}`.
         case status(Int, body: String = "{}")
         case failure(URLError)
-        /// No answer at all, until the request is cancelled.
+        /// No answer at all, until the request is cancelled or `answerHanging(on:with:)` answers it.
         case hang
         /// `answer`, `seconds` after the request was sent.
         case after(TimeInterval, Answer)
     }
 
     nonisolated(unsafe) static var answers: [String: Answer] = [:] {
-        didSet { requestedHosts = [] }
+        didSet {
+            requestedHosts = []
+            hangingLock.withLock { hanging = [] }
+        }
     }
 
     private static let hosts = Mutex<[String]>([])
@@ -346,10 +458,36 @@ private final class StubProtocol: URLProtocol, @unchecked Sendable {
         set { hosts.withLock { $0 = newValue } }
     }
 
-    override static func canInit(with _: URLRequest) -> Bool { true }
+    /// A request left hanging: its stub, its host, and a way to answer it. Kept under a lock, and without the stub itself,
+    /// which the compiler lets neither into a `Mutex` nor be answered from a static method.
+    private struct Hanging {
+        let stub: ObjectIdentifier
+        let host: String?
+        let answer: @Sendable (Answer) -> Void
+    }
+
+    private static let hangingLock = NSLock()
+    private nonisolated(unsafe) static var hanging: [Hanging] = []
+
+    /// Answers the requests to `host` left hanging with `answer`, once there is one: a request's host is recorded a
+    /// moment before it hangs.
+    static func answerHanging(on host: String, with answer: Answer) async throws {
+        try await eventually { hangingLock.withLock { hanging.contains { $0.host == host } } }
+        let requests = hangingLock.withLock {
+            defer { hanging.removeAll { $0.host == host } }
+            return hanging.filter { $0.host == host }
+        }
+        for request in requests {
+            request.answer(answer)
+        }
+    }
+
+    override static func canInit(with request: URLRequest) -> Bool { request.url?.host != LoopbackServer.host }
     override static func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
+        // A request cancelled as it was sent, perhaps in the test before, still reaches here, already completed.
+        guard task?.state == .running else { return }
         let host = request.url?.host ?? ""
         Self.hosts.withLock { $0.append(host) }
         guard let url = request.url, let answer = Self.answers[host] else {
@@ -367,7 +505,9 @@ private final class StubProtocol: URLProtocol, @unchecked Sendable {
                 self.deliver(answer, for: url)
             }
         case .hang:
-            break
+            Self.hangingLock.withLock {
+                Self.hanging.append(Hanging(stub: ObjectIdentifier(self), host: url.host) { self.deliver($0, for: url) })
+            }
         case let .failure(error):
             client?.urlProtocol(self, didFailWithError: error)
         case let .status(code, body):
@@ -383,5 +523,7 @@ private final class StubProtocol: URLProtocol, @unchecked Sendable {
         }
     }
 
-    override func stopLoading() {}
+    override func stopLoading() {
+        Self.hangingLock.withLock { Self.hanging.removeAll { $0.stub == ObjectIdentifier(self) } }
+    }
 }

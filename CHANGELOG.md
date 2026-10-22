@@ -35,6 +35,13 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ### Fixed
 
+- A request whose primary endpoint never answers goes on to a mirror again, within its timeout. Since 0.2.0 the
+  request's deadline, as long as the primary's own timeout, cancelled the primary first, so no mirror was tried. Now a
+  primary that has neither begun its answer nor taken the request's body within
+  `BackendConfiguration.mirrorRequestTimeout` has a mirror looked up; once one is ready, a GET goes to the mirror too
+  and the first answer wins, and a request with a body moves to the mirror. A request without a body that is not a GET
+  stays with the primary, which may already be acting on it, and so does a request whose timeout is no longer than
+  `mirrorRequestTimeout`.
 - `SplitTunnelManager` reads its proxy configuration from the system at every call, so one removed in System
   Settings while the app runs is made again at the next call (macOS may ask to allow it again) instead of
   being started, which never connects. It still keeps the configuration it loaded last, so the system goes on
