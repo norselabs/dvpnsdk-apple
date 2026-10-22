@@ -15,8 +15,8 @@ public struct XConfigurationModel: Codable, Sendable, Equatable {
     public var outbound: XOutbound
     public var transport: XTransport
     public var security: XSecurity
-    /// The app's "Advanced obfuscation" setting at connect time. Absent in files written by older
-    /// app versions, which decode as `.none`.
+    /// The obfuscation the app chose at connect time. Absent in files written by older app versions, which decode
+    /// as `.none`.
     public var obfuscation: XObfuscation
 
     public init(

@@ -131,8 +131,7 @@ public enum RequestTimeout {
     public static let config: TimeInterval = 5
     /// The IP lookup is short: the app retries it, and a tunnel that just came up answers it at once.
     public static let publicIP: TimeInterval = 3
-    /// Credentials wait for the node handshake; a minute bounds how long Home can show "Creating new DVPN session…"
-    /// per attempt (a primary that stays silent hands the request to a mirror within that minute; one that took it
-    /// keeps the whole minute).
+    /// Credentials wait for the node handshake; a minute bounds how long one connect attempt waits for them (a primary
+    /// that stays silent hands the request to a mirror within that minute; one that took it keeps the whole minute).
     public static let credentials: TimeInterval = 60
 }

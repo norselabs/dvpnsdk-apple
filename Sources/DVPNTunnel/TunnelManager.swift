@@ -233,7 +233,7 @@ extension TunnelManager {
         try await startXray(source: .model(model), descriptor: try requiredDescriptor(for: .xray))
     }
 
-    /// The app's "Advanced obfuscation" setting, read at connect time so a toggle applies to the next connection.
+    /// The app's obfuscation setting, read at connect time so a toggle applies to the next connection.
     var selectedObfuscation: XObfuscation {
         storage.isObfuscationEnabled ? .tlsFragment(.init()) : .none
     }
