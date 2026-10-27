@@ -62,7 +62,7 @@ struct WireRequestTests {
     }
 
     /// Every credentials request sends the node types given, comma-joined, and none for an empty list: quick, country
-    /// and city credentials none for "all", a server's credentials its list, as the apps ask.
+    /// and city credentials in the `filter` query, as the lists do, with no body; a server's in its body.
     @Test
     func credentialsSendTheNodeTypesGivenOrNone() async throws {
         let sent = try await requests { client in
@@ -80,27 +80,19 @@ struct WireRequestTests {
 
         #expect(sent.map(line) == [
             "POST https://backend.test/credentials",
-            "POST https://backend.test/credentials",
-            "POST https://backend.test/credentials",
+            "POST https://backend.test/credentials?filter=AMNEZIAWG",
+            "POST https://backend.test/credentials?filter=WIREGUARD,XRAY",
             "POST https://backend.test/country/de/credentials",
-            "POST https://backend.test/country/de/credentials",
+            "POST https://backend.test/country/de/credentials?filter=V2RAY,HYSTERIA2",
             "POST https://backend.test/city/berlin/credentials",
-            "POST https://backend.test/city/berlin/credentials",
+            "POST https://backend.test/city/berlin/credentials?filter=V2RAY",
             "POST https://backend.test/server/srv-1/credentials",
             "POST https://backend.test/server/srv-1/credentials",
         ])
-        #expect(try sent.map(body) == [
-            [:],
-            ["protocol": "AMNEZIAWG"],
-            ["protocol": "WIREGUARD,XRAY"],
-            [:],
-            ["protocol": "V2RAY,HYSTERIA2"],
-            [:],
-            ["protocol": "V2RAY"],
-            ["protocol": Self.allNodeTypes],
-            ["protocol": "XRAY"],
-        ])
-        #expect(sent.allSatisfy { $0.timeoutInterval == 60 && $0.value(forHTTPHeaderField: "Content-Type") == "application/json" })
+        #expect(try sent.map(body) == [nil, nil, nil, nil, nil, nil, nil, ["protocol": Self.allNodeTypes], ["protocol": "XRAY"]])
+        #expect(sent.allSatisfy { $0.timeoutInterval == 60 })
+        let contentTypes = sent.map { $0.value(forHTTPHeaderField: "Content-Type") }
+        #expect(contentTypes == Array(repeating: nil, count: 7) + ["application/json", "application/json"])
     }
 
     /// The IP lookup goes over a new connection, so a tunnel that just came up answers it.

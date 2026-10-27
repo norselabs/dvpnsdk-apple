@@ -31,9 +31,26 @@ extension [NodeType] {
     }
 }
 
+// MARK: - CredentialsFilter
+
+/// The query of a quick, country or city credentials request: the node types it accepts (`filter`, comma-joined, as the
+/// lists send it); with none, no query, and the backend picks among WireGuard and V2Ray nodes only.
+struct CredentialsFilter: Sendable {
+    let nodeTypes: [NodeType]
+
+    init(_ nodeTypes: [NodeType]) {
+        self.nodeTypes = nodeTypes
+    }
+
+    var queryItems: [URLQueryItem] {
+        nodeTypes.isEmpty ? [] : [URLQueryItem(name: "filter", value: nodeTypes.wireValue)]
+    }
+}
+
 // MARK: - CredentialsBody
 
-/// The JSON body of a credentials request: the node types it accepts, comma-joined; with none, the key is left out.
+/// The JSON body of a server's credentials request: the node types it accepts, comma-joined; with none, the key is left
+/// out.
 struct CredentialsBody: Sendable {
     let nodeTypes: [NodeType]
 

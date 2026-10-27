@@ -7,10 +7,10 @@ import Foundation
 
 enum ConnectionAPITarget {
     case ip
-    case credentialsCity(id: String, body: CredentialsBody)
-    case credentialsCountry(id: String, body: CredentialsBody)
+    case credentialsCity(id: String, filter: CredentialsFilter)
+    case credentialsCountry(id: String, filter: CredentialsFilter)
     case credentialsServer(id: String, body: CredentialsBody)
-    case quickCredentials(body: CredentialsBody)
+    case quickCredentials(filter: CredentialsFilter)
 }
 
 extension ConnectionAPITarget: APITarget {
@@ -42,7 +42,9 @@ extension ConnectionAPITarget: APITarget {
         switch self {
         case .ip:
             return .none
-        case let .credentialsCity(_, body), let .credentialsCountry(_, body), let .credentialsServer(_, body), let .quickCredentials(body):
+        case let .credentialsCity(_, filter), let .credentialsCountry(_, filter), let .quickCredentials(filter):
+            return .query(filter.queryItems)
+        case let .credentialsServer(_, body):
             return .json(body)
         }
     }
