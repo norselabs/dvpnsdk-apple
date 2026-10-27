@@ -13,7 +13,7 @@ public protocol APITarget: Sendable {
     var path: String { get }
     var payload: RequestPayload { get }
     /// Whether a 401, 403 or 425 (or an `appIsInactive` error) from this request describes the device, and
-    /// is broadcast as `.unauthorized`, `.banned`, `.unenrolled` or `.isInactive`. Requests that fail with
+    /// is broadcast as `.unauthorized`, `.banned`, `.notEnrolled` or `.appInactive`. Requests that fail with
     /// these codes for their own reasons, such as a sign-in with a wrong password, return `false`.
     var reportsDeviceState: Bool { get }
 }

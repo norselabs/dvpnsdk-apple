@@ -124,7 +124,7 @@ let countries = try await nodeCatalog.countries(nodeTypes)
 
 Every failure is an `APIError`: `.offline`, `.unreachable`, `.backend(status:code:)` or `.invalidResponse`, with its
 `reason`, `isTransient` and `deviceState`. The SDK writes no user-facing text. Device states (unauthorized, banned,
-not enrolled) also arrive as `DeviceEventsClient.events()`, from whichever request revealed them.
+not enrolled, app inactive) also arrive as `DeviceEventsClient.events()`, from whichever request revealed them.
 
 ### 3. Add the extensions
 
@@ -264,7 +264,7 @@ scripts/build-wireguard-go.sh   # WireGuardKitGo: amneziawg-go, GoBridge/wiregua
 
 They need Go (the pinned toolchain downloads itself), Xcode with the iOS and tvOS SDKs, and Python 3.
 After a rebuild, `scripts/gen-credits.py` updates CREDITS.md from the new inventories. `scripts/make-release-assets.sh`
-zips the four frameworks and prints the checksums for `Package.swift`.
+zips the four frameworks and writes their checksums and `binaryRelease` into `Package.swift`.
 
 ## Working on it
 

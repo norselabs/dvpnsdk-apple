@@ -110,7 +110,7 @@ func Version() string {
 	return version
 }
 
-// stderrLogger forwards SOCKS5 events to the process log (visible in Console for the extension).
+// stderrLogger writes failed SOCKS5 connections to standard error, which an extension discards.
 type stderrLogger struct{}
 
 func (stderrLogger) TCPRequest(addr net.Addr, reqAddr string) {}

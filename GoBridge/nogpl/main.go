@@ -4,7 +4,8 @@
 // patched copies that -replace names (Xray-core and REALITY, GoBridge/).
 //
 // For every module in the build graphs of the Apple slices (GOOS ios and darwin,
-// arm64 and amd64, -tags=<GOOS> as both build scripts pass) it scans the license
+// arm64 and amd64, -tags=<GOOS> as the LibXray and LibHysteria builds pass; the
+// WireGuardKitGo build passes none, so the scan covers more) it scans the license
 // files (module root, and every linked package directory up to the root) for
 // any GNU license name, after removing the canonical MPL-2.0 text; and it scans
 // every compiled file (Go, cgo, C, headers, assembly, Objective-C, syso,
@@ -51,9 +52,9 @@ func (r replacements) Set(v string) error {
 
 type target struct{ goos, goarch string }
 
-// The slices scripts/build-libxray.sh (through libXray's build/app/apple_go.py)
-// and scripts/build-libhysteria.sh build: tvOS and the simulators are GOOS=ios,
-// macOS is GOOS=darwin; each passes -tags=<GOOS>.
+// The slices scripts/build-libxray.sh (through libXray's build/app/apple_go.py),
+// scripts/build-libhysteria.sh and scripts/build-wireguard-go.sh build: tvOS and
+// the simulators are GOOS=ios, macOS is GOOS=darwin.
 var targets = []target{
 	{"ios", "arm64"},
 	{"ios", "amd64"},
