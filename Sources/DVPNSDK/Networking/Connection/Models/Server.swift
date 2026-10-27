@@ -14,6 +14,8 @@ public struct Server: Equatable, Sendable {
     public let isAvailable: Bool
     /// The node type as the backend sent it; kept as a string, since a server is stored and read back leniently.
     public let serverProtocol: String
+    /// The node's address on the network (`sentnode…`), when the backend sent one.
+    public let address: String?
 
     public var country: Country?
 
@@ -25,7 +27,8 @@ public struct Server: Equatable, Sendable {
         load: Double = 0.5,
         name: String,
         isAvailable: Bool,
-        serverProtocol: String
+        serverProtocol: String,
+        address: String? = nil
     ) {
         self.id = id
         self.countryID = countryID
@@ -35,6 +38,7 @@ public struct Server: Equatable, Sendable {
         self.load = load
         self.isAvailable = isAvailable
         self.serverProtocol = serverProtocol
+        self.address = address
     }
 }
 
@@ -59,5 +63,6 @@ extension Server: Codable {
         case name
         case isAvailable = "is_available"
         case serverProtocol = "protocol"
+        case address
     }
 }

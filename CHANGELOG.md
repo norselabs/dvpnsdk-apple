@@ -5,6 +5,10 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ## Unreleased
 
+### Added
+
+- `Server.address`: the node's address on the network (`sentnode…`), when the backend sends one.
+
 ### Changed
 
 - `ConnectionAPIClient`'s `quickCredentials`, `countryCredentials` and `cityCredentials` take a list of node types, as

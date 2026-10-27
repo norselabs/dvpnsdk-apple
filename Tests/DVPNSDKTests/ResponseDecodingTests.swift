@@ -40,6 +40,16 @@ struct ResponseDecodingTests {
         )
         #expect(server == Server(id: "s1", countryID: "de", cityID: "ber", load: 0.42, name: "Berlin 1", isAvailable: true, serverProtocol: "XRAY"))
         #expect(server.country == nil)
+        #expect(server.address == nil)
+    }
+
+    @Test
+    func serverWithItsNodeAddress() throws {
+        let server = try decode(
+            Server.self,
+            #"{"id":"s1","country_id":"de","city_id":"ber","load":0.4,"name":"B","is_available":true,"protocol":"XRAY","address":"sentnode1a"}"#
+        )
+        #expect(server.address == "sentnode1a")
     }
 
     @Test
