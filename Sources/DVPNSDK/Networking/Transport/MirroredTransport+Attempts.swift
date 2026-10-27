@@ -377,7 +377,7 @@ extension APIRequest {
     /// silent primary may hand it over: a GET by its answer, a request with a body by the body. Any other shows
     /// nothing before its answer, and the primary may already be acting on it.
     var canBeHandedOver: Bool {
-        if case .json = target.payload { return true }
+        if target.payload.jsonBody != nil { return true }
         return target.method == .get
     }
 }

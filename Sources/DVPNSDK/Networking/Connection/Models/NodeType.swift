@@ -34,7 +34,8 @@ extension [NodeType] {
 // MARK: - CredentialsFilter
 
 /// The query of a quick, country or city credentials request: the node types it accepts (`filter`, comma-joined, as the
-/// lists send it); with none, no query, and the backend picks among WireGuard and V2Ray nodes only.
+/// lists send it); with none, no query, and the backend picks among WireGuard and V2Ray nodes only. The request still
+/// sends an empty JSON body (`EmptyJSONObject`): the backend refuses one without (400).
 struct CredentialsFilter: Sendable {
     let nodeTypes: [NodeType]
 
@@ -46,6 +47,9 @@ struct CredentialsFilter: Sendable {
         nodeTypes.isEmpty ? [] : [URLQueryItem(name: "filter", value: nodeTypes.wireValue)]
     }
 }
+
+/// `{}`, the body of a quick, country or city credentials request.
+struct EmptyJSONObject: Encodable, Sendable {}
 
 // MARK: - CredentialsBody
 

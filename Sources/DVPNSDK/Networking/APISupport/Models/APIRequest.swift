@@ -27,7 +27,8 @@ extension APIRequest {
     func urlRequest(baseURL: URL) throws -> URLRequest {
         var url = target.path.isEmpty ? baseURL : baseURL.appendingPathComponent(target.path)
 
-        if case let .query(items) = target.payload, !items.isEmpty {
+        let items = target.payload.queryItems
+        if !items.isEmpty {
             guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { throw URLError(.badURL) }
             components.queryItems = (components.queryItems ?? []) + items.sorted { $0.name < $1.name }
             guard let withQuery = components.url else { throw URLError(.badURL) }
@@ -40,7 +41,7 @@ extension APIRequest {
         // API answers are never served from the HTTP cache: they describe live state (IP, servers, credentials).
         request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
 
-        if case let .json(body) = target.payload {
+        if let body = target.payload.jsonBody {
             request.httpBody = try JSONEncoder().encode(AnyEncodable(body))
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }

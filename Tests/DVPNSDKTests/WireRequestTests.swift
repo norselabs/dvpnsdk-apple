@@ -62,7 +62,8 @@ struct WireRequestTests {
     }
 
     /// Every credentials request sends the node types given, comma-joined, and none for an empty list: quick, country
-    /// and city credentials in the `filter` query, as the lists do, with no body; a server's in its body.
+    /// and city credentials in the `filter` query, as the lists do, with an empty JSON body, which the backend needs; a
+    /// server's in its body.
     @Test
     func credentialsSendTheNodeTypesGivenOrNone() async throws {
         let sent = try await requests { client in
@@ -89,10 +90,21 @@ struct WireRequestTests {
             "POST https://backend.test/server/srv-1/credentials",
             "POST https://backend.test/server/srv-1/credentials",
         ])
-        #expect(try sent.map(body) == [nil, nil, nil, nil, nil, nil, nil, ["protocol": Self.allNodeTypes], ["protocol": "XRAY"]])
-        #expect(sent.allSatisfy { $0.timeoutInterval == 60 })
-        let contentTypes = sent.map { $0.value(forHTTPHeaderField: "Content-Type") }
-        #expect(contentTypes == Array(repeating: nil, count: 7) + ["application/json", "application/json"])
+        #expect(try sent.map(body) == [[:], [:], [:], [:], [:], [:], [:], ["protocol": Self.allNodeTypes], ["protocol": "XRAY"]])
+        #expect(sent.allSatisfy { $0.timeoutInterval == 60 && $0.value(forHTTPHeaderField: "Content-Type") == "application/json" })
+    }
+
+    /// Every credentials request has a body, so a primary that stays silent can hand it to a mirror.
+    @Test
+    func credentialsCanBeHandedOver() async {
+        let client = RecordingClient()
+        let connection = ConnectionAPIClient.live(httpClient: client)
+        _ = try? await connection.quickCredentials([.xray])
+        _ = try? await connection.countryCredentials(Self.country, [])
+        _ = try? await connection.cityCredentials(Self.city, NodeType.allCases)
+        _ = try? await connection.serverCredentials(Self.server, [.xray])
+        let requests = client.requests.withLock { $0 }
+        #expect(requests.count == 4 && requests.allSatisfy(\.canBeHandedOver))
     }
 
     /// The IP lookup goes over a new connection, so a tunnel that just came up answers it.

@@ -51,4 +51,24 @@ public enum RequestPayload: Sendable {
     case json(any Encodable & Sendable)
     /// URL query items, sent in name order.
     case query([URLQueryItem])
+    /// URL query items, sent in name order, and a JSON body encoded from the value.
+    case queryAndJSON([URLQueryItem], any Encodable & Sendable)
+}
+
+extension RequestPayload {
+    /// The query items it sends, if any.
+    var queryItems: [URLQueryItem] {
+        switch self {
+        case let .query(items), let .queryAndJSON(items, _): items
+        case .none, .json: []
+        }
+    }
+
+    /// The value its JSON body is encoded from, if it has one.
+    var jsonBody: (any Encodable & Sendable)? {
+        switch self {
+        case let .json(body), let .queryAndJSON(_, body): body
+        case .none, .query: nil
+        }
+    }
 }

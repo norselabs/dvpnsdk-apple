@@ -43,7 +43,7 @@ extension ConnectionAPITarget: APITarget {
         case .ip:
             return .none
         case let .credentialsCity(_, filter), let .credentialsCountry(_, filter), let .quickCredentials(filter):
-            return .query(filter.queryItems)
+            return .queryAndJSON(filter.queryItems, EmptyJSONObject())
         case let .credentialsServer(_, body):
             return .json(body)
         }

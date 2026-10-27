@@ -8,13 +8,14 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 ### Added
 
 - `Server.address`: the node's address on the network (`sentnode…`), when the backend sends one.
+- `RequestPayload.queryAndJSON`: a request's query items and a JSON body together.
 
 ### Changed
 
 - `ConnectionAPIClient`'s `quickCredentials`, `countryCredentials` and `cityCredentials` take a list of node types, as
   `serverCredentials` does, instead of one or none, and send it as the lists do: in the `filter` query, comma-joined in
-  the order given, with no body. An empty list sends none, as `nil` did, and the backend then picks only WireGuard or
-  V2Ray nodes. To update, pass `[nodeType]` for a node type and `[]` for `nil`.
+  the order given, with an empty JSON body. An empty list sends none, as `nil` did, and the backend then picks only
+  WireGuard or V2Ray nodes. To update, pass `[nodeType]` for a node type and `[]` for `nil`.
 - A disconnect or a server switch no longer waits for the provider to write its `ExtensionLogFile`, which takes about
   ten seconds on an iPhone. A provider now writes the file only after a failure: when its start fails, when its tunnel
   stops for a reason nobody asked for (a lost network, for instance), and when `TunnelManager` stops a start that
