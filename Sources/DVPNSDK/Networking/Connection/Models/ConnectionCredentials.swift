@@ -169,8 +169,8 @@ extension ConnectionCredentials: Decodable {
         in response: KeyedDecodingContainer<HandshakeResponseKeys>
     ) throws -> WireGuardEndpoint {
         let inner = try decoder.decode(WireGuardHandshakeData.self, from: data)
-        // The first address is the endpoint here too; the rest are not tried.
-        guard let firstAddr = inner.addrs.first else {
+        // The addresses the node assigned the client, one per IP family it serves; the first is the tunnel's own.
+        guard !inner.addrs.isEmpty else {
             throw DecodingError.dataCorruptedError(
                 forKey: .data,
                 in: response,
@@ -184,12 +184,13 @@ extension ConnectionCredentials: Decodable {
                 debugDescription: "WireGuard handshake metadata is empty"
             )
         }
-        let clientAddress = firstAddr.split(separator: "/").first.map(String.init) ?? firstAddr
+        let clientAddresses = inner.addrs.map { addr in addr.split(separator: "/").first.map(String.init) ?? addr }
         return WireGuardEndpoint(
             host: host,
             port: firstMetadata.port,
-            clientAddress: clientAddress,
-            peerPublicKey: firstMetadata.publicKey
+            clientAddress: clientAddresses[0],
+            peerPublicKey: firstMetadata.publicKey,
+            clientAddresses: clientAddresses
         )
     }
 }

@@ -163,7 +163,16 @@ class PacketTunnelSettingsGenerator {
 
         if !tunnelConfiguration.interface.dnsSearch.isEmpty || !tunnelConfiguration.interface.dns.isEmpty {
             let dnsServerStrings = tunnelConfiguration.interface.dns.map { $0.stringRepresentation }
-            let dnsSettings = NEDNSSettings(servers: dnsServerStrings)
+            let dnsSettings: NEDNSSettings
+            if let dnsOverHTTPSURL = tunnelConfiguration.interface.dnsOverHTTPSURL, !dnsServerStrings.isEmpty {
+                // DNS over HTTPS at the configured servers. The system's own failover (`allowFailover`) stays off: it
+                // would fall back to the network's resolver, outside the tunnel.
+                let encryptedSettings = NEDNSOverHTTPSSettings(servers: dnsServerStrings)
+                encryptedSettings.serverURL = dnsOverHTTPSURL
+                dnsSettings = encryptedSettings
+            } else {
+                dnsSettings = NEDNSSettings(servers: dnsServerStrings)
+            }
             dnsSettings.searchDomains = tunnelConfiguration.interface.dnsSearch
             if !tunnelConfiguration.interface.dns.isEmpty {
                 dnsSettings.matchDomains = [""] // All DNS queries must first go through the tunnel's DNS

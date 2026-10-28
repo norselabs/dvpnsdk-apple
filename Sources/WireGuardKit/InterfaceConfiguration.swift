@@ -22,6 +22,9 @@ public struct InterfaceConfiguration {
     public var mtu: UInt16?
     public var dns = [DNSServer]()
     public var dnsSearch = [String]()
+    /// DNS over HTTPS (RFC 8484) at `dns`: the tunnel's resolver is this URL, which the system reaches at those
+    /// addresses. nil: plain DNS. wg-quick has no such key; this package writes it as `DNSOverHTTPS`.
+    public var dnsOverHTTPSURL: URL?
     public var specialJunk1: String?
     public var specialJunk2: String?
     public var specialJunk3: String?
@@ -53,6 +56,7 @@ extension InterfaceConfiguration: Equatable {
             lhs.mtu == rhs.mtu &&
             lhs.dns == rhs.dns &&
             lhs.dnsSearch == rhs.dnsSearch &&
+            lhs.dnsOverHTTPSURL == rhs.dnsOverHTTPSURL &&
             lhs.junkPacketCount == rhs.junkPacketCount &&
             lhs.junkPacketMinSize == rhs.junkPacketMinSize &&
             lhs.junkPacketMaxSize == rhs.junkPacketMaxSize &&
