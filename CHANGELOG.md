@@ -12,6 +12,11 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ### Changed
 
+- `ConnectionCredentials` reads the WireGuard key, for WireGuard and AmneziaWG nodes, from the credentials answer's
+  `connection_handshake.request.private_key`, and the top-level `private_key` only when the request has none. The
+  top-level field is an older copy that the backend will stop sending. Up to 0.3.0 the SDK read only that field, so
+  an app on 0.3.0 or older cannot start a WireGuard or AmneziaWG tunnel once it is gone (`emptyCredentials`): update
+  to this version before then.
 - `ConnectionAPIClient`'s `quickCredentials`, `countryCredentials` and `cityCredentials` take a list of node types, as
   `serverCredentials` does, instead of one or none, and send it as the lists do: in the `filter` query, comma-joined in
   the order given, with an empty JSON body. An empty list sends none, as `nil` did, and the backend then picks only

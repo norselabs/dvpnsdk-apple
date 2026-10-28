@@ -2,23 +2,74 @@
 import Foundation
 import Testing
 
+/// The WireGuard key the handshake request carries, and the top-level copy the backend is removing.
+private let keyInRequest = "oK56DE9Ue9zHAt61A8xBeLjd9zLOUlGmk8hYB7sTf1k="
+private let keyAtTopLevel = "WAmgVYXkbT2bCtdcDwolI88/iqlDu4tf4B9Bl6qaJ0U="
+
 struct ConnectionCredentialsDecodingTests {
-    private func credentialsJSON(protocol rawProtocol: String, handshake: [String: Any], addrs: [String] = ["203.0.113.10"]) throws -> Data {
+    /// A credentials answer's `data`. `request` is the handshake request's fields; nil leaves the request out.
+    private func credentialsJSON(
+        protocol rawProtocol: String,
+        handshake: [String: Any],
+        addrs: [String] = ["203.0.113.10"],
+        topLevelKey: String? = keyAtTopLevel,
+        request: [String: Any]? = nil
+    ) throws -> Data {
         let inner = try JSONSerialization.data(withJSONObject: handshake)
-        let payload: [String: Any] = [
-            "protocol": rawProtocol,
-            "private_key": "WAmgVYXkbT2bCtdcDwolI88/iqlDu4tf4B9Bl6qaJ0U=",
-            "uid": "test-uid",
-            "server_id": "srv-1",
-            "connection_handshake": [
-                "response": [
-                    "addrs": addrs,
-                    "data": inner.base64EncodedString(),
-                ],
+        var connectionHandshake: [String: Any] = [
+            "response": [
+                "addrs": addrs,
+                "data": inner.base64EncodedString(),
             ],
         ]
+        connectionHandshake["request"] = request
+        var payload: [String: Any] = [
+            "protocol": rawProtocol,
+            "uid": "test-uid",
+            "server_id": "srv-1",
+            "connection_handshake": connectionHandshake,
+        ]
+        payload["private_key"] = topLevelKey
         return try JSONSerialization.data(withJSONObject: payload)
     }
+
+    private func decodedKey(protocol rawProtocol: String = "WIREGUARD", topLevelKey: String?, request: [String: Any]?) throws -> String? {
+        let data = try credentialsJSON(protocol: rawProtocol, handshake: wireGuardHandshake, topLevelKey: topLevelKey, request: request)
+        return try JSONDecoder().decode(ConnectionCredentials.self, from: data).privateKey
+    }
+
+    // MARK: - The WireGuard key
+
+    /// The key is read from the handshake request, for AmneziaWG as for WireGuard.
+    @Test(arguments: ["WIREGUARD", "AMNEZIAWG"])
+    func theKeyComesFromTheHandshakeRequest(protocol rawProtocol: String) throws {
+        let key = try decodedKey(
+            protocol: rawProtocol,
+            topLevelKey: nil,
+            request: ["uuid": "test-uid", "private_key": keyInRequest]
+        )
+        #expect(key == keyInRequest)
+    }
+
+    @Test
+    func theRequestsKeyWinsOverTheTopLevelCopy() throws {
+        let key = try decodedKey(topLevelKey: keyAtTopLevel, request: ["uuid": "test-uid", "private_key": keyInRequest])
+        #expect(key == keyInRequest)
+    }
+
+    /// An answer from a backend that still sends only the top-level copy, or a blank key in the request.
+    @Test(arguments: [nil, ["uuid": "test-uid"], ["uuid": "test-uid", "private_key": ""]] as [[String: String]?])
+    func theTopLevelCopyIsReadWhenTheRequestHasNoKey(request: [String: String]?) throws {
+        #expect(try decodedKey(topLevelKey: keyAtTopLevel, request: request) == keyAtTopLevel)
+    }
+
+    /// An answer with no key still decodes; starting a WireGuard tunnel from it fails (`TunnelManagerActivationTests`).
+    @Test
+    func noKeyDecodesAsNone() throws {
+        #expect(try decodedKey(topLevelKey: nil, request: ["uuid": "test-uid"]) == nil)
+    }
+
+    // MARK: - Node types
 
     private let wireGuardHandshake: [String: Any] = [
         "addrs": ["10.10.0.2/32"],

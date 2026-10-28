@@ -196,7 +196,7 @@ The model can also be filled in field by field from the same answer:
 
 | Node type | `endpoint` | Also needs |
 |---|---|---|
-| WireGuard | `.wireGuard(WireGuardEndpoint(host:port:clientAddress:peerPublicKey:))` | `privateKey`: the answer's WireGuard private key (`private_key`) |
+| WireGuard | `.wireGuard(WireGuardEndpoint(host:port:clientAddress:peerPublicKey:))` | `privateKey`: the answer's WireGuard private key (`connection_handshake.request.private_key`) |
 | AmneziaWG | `.amneziaWG(AmneziaWGEndpoint(wireGuard:parameters:))`, the parameters as their `[Interface]` keys (`S1`, `H1`, …) | `privateKey`, as for WireGuard |
 | Xray | `.xrayNode(XrayNodeEndpoint(host:inbounds:))` | `uid`: the answer's client UUID |
 | V2Ray | `.v2ray(V2RayNodeEndpoint(host:inbounds:))` | `uid`, as for Xray |

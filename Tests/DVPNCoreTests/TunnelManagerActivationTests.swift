@@ -4,6 +4,7 @@
 //
 
 import DVPNCoreKit
+import DVPNSDK
 @testable import DVPNTunnel
 import Foundation
 import NetworkExtension
@@ -184,6 +185,25 @@ struct TunnelManagerActivationTests {
 
         #expect(profile.stops == 1)
         #expect(!profile.messages.contains(ExtensionLogFile.failedStopNotice))
+    }
+
+    /// Credentials without a WireGuard key fail before any profile is touched, for AmneziaWG as for WireGuard.
+    @Test(arguments: [NodeType.wireguard, .amneziawg])
+    func aStartWithoutAKeyFails(nodeType: NodeType) async throws {
+        let profile = FakeTunnelProfile(name: "WireGuard", providerBundleID: "com.example.vpn.wireguard-ne")
+        let (manager, _) = makeManager([profile])
+        let node = WireGuardEndpoint(
+            host: "203.0.113.10", port: 51820, clientAddress: "10.10.0.2", peerPublicKey: "xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg="
+        )
+        let endpoint: ConnectionEndpoint = nodeType == .wireguard
+            ? .wireGuard(node)
+            : .amneziaWG(AmneziaWGEndpoint(wireGuard: node, parameters: [:]))
+
+        await #expect(throws: TunnelsServiceError.emptyCredentials) {
+            try await manager.start(from: ConnectionCredentials(nodeType: nodeType, endpoint: endpoint))
+        }
+        #expect(profile.saves == 0)
+        #expect(profile.starts == 0)
     }
 
     /// A manager over a service of fake profiles that report their status changes to it.

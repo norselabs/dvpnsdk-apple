@@ -53,6 +53,7 @@ extension ConnectionCredentials: Decodable {
 
     enum HandshakeRequestKeys: String, CodingKey {
         case uuid
+        case privateKey = "private_key"
     }
 
     enum HandshakeResponseKeys: String, CodingKey {
@@ -77,16 +78,19 @@ extension ConnectionCredentials: Decodable {
 
         server = try? container.decode(Server.self, forKey: .server)
         serverID = try? container.decode(String.self, forKey: .serverID)
-        privateKey = try? container.decode(String.self, forKey: .privateKey)
 
         let handshake = try container.nestedContainer(
             keyedBy: HandshakeKeys.self,
             forKey: .connectionHandshake
         )
+        let request = try? handshake.nestedContainer(keyedBy: HandshakeRequestKeys.self, forKey: .request)
         // New node types identify the client by the UUID echoed in the handshake request.
-        let requestUUID = (try? handshake.nestedContainer(keyedBy: HandshakeRequestKeys.self, forKey: .request))
-            .flatMap { try? $0.decode(String.self, forKey: .uuid) }
+        let requestUUID = request.flatMap { try? $0.decode(String.self, forKey: .uuid) }
         uid = (try? container.decode(String.self, forKey: .uid)) ?? requestUUID
+        // The WireGuard key made for this request; the top-level `private_key` is an older copy of it, read only when
+        // the request has none.
+        let requestKey = request.flatMap { try? $0.decode(String.self, forKey: .privateKey) }
+        privateKey = requestKey.nonEmpty ?? (try? container.decode(String.self, forKey: .privateKey))
         let response = try handshake.nestedContainer(
             keyedBy: HandshakeResponseKeys.self,
             forKey: .response
