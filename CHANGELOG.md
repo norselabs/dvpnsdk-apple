@@ -49,6 +49,11 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ### Fixed
 
+- A TCP connection through the Xray, V2Ray or Hysteria 2 tunnel ends about a second after the far side closes it,
+  instead of a minute later. The `HevSocks5Tunnel` engine is now hev-socks5-tunnel 2.19.3 instead of 2.8.0, which
+  passed such a close on to the app only when its 60-second `read-write-timeout` ran out, so an app that read until
+  the server closed waited that minute. A connection on which nothing comes back for 60 seconds is still closed then,
+  as before: so is one to a destination the node cannot reach, which the proxy accepts before the node dials.
 - A request whose primary endpoint never answers goes on to a mirror again, within its timeout. Since 0.2.0 the
   request's deadline, as long as the primary's own timeout, cancelled the primary first, so no mirror was tried. Now a
   primary that has neither begun its answer nor taken the request's body within

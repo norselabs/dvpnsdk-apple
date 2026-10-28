@@ -17,7 +17,7 @@
 # to 0x4000" when linking. Regular zero-filled globals keep the compiler's alignment instead.
 set -euo pipefail
 
-HEV_TAG="2.8.0"
+HEV_TAG="2.19.3"
 IOS_MIN="18.0"
 TVOS_MIN="18.0"
 MACOS_MIN="15.0"
@@ -58,11 +58,6 @@ HEADERS="$BUILD/include"
 rm -rf "$BUILD"
 mkdir -p "$SLICES" "$HEADERS"
 
-# hev-socks5-tunnel compiles with -Wall -Werror; newer clangs add warnings the release predates
-# (2.8.0: an uninitialised byte written to the wake-up pipe, -Wuninitialized-const-pointer).
-# -Wno-unknown-warning-option keeps the list valid for older clangs.
-CFLAGS_WARNINGS="-Wno-unknown-warning-option -Wno-uninitialized-const-pointer"
-
 # build <slice> <sdk> <arch> <minimum-version flag>: one architecture of one slice.
 build() {
     local slice=$1 sdk=$2 arch=$3 min=$4
@@ -71,7 +66,7 @@ build() {
     make -C "$SOURCE" --no-print-directory clean >/dev/null
     make -C "$SOURCE" --no-print-directory -j"$(sysctl -n hw.ncpu)" \
         PP="$clang" CC="$clang" AR="xcrun --sdk $sdk ar" \
-        CFLAGS="-arch $arch $min -fno-common $CFLAGS_WARNINGS" \
+        CFLAGS="-arch $arch $min -fno-common" \
         LFLAGS="-arch $arch $min" \
         static >/dev/null
     mkdir -p "$SLICES/$slice/archs"
