@@ -45,6 +45,9 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   stopped being `LocalizedError`s.
 - `WireGuardAdapter.start` builds without the "'weak' ownership of capture 'self'" warning that recent Swift
   compilers give in every app that builds the package.
+- An app that declares no WireGuard extension no longer traps when `TunnelManager` loads its tunnels. WireGuard and
+  AmneziaWG credentials then fail at `start(from:)` with `TunnelsServiceError.unsupportedProtocol`, as the other
+  engines' do, and `NETunnelProviderProtocol(tunnelConfiguration:)` returns nil instead of trapping.
 
 ### Security
 
