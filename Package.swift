@@ -6,11 +6,11 @@ import PackageDescription
 
 /// The release whose assets hold the prebuilt engines. `Frameworks/<name>.xcframework`, built by the scripts in
 /// `scripts/`, takes precedence when it exists, so a change to an engine is tested without a release.
-let binaryRelease = "0.1.0"
+let binaryRelease = "0.4.0"
 let binaryChecksums = [
     "LibXray": "4ed44ed79cd21a2f88e92c3dfadfc1cc189a03e93692255592648bb85ec7b5a2",
     "LibHysteria": "83750f6bd6356a76fa1239ab3f8286493c8b75ccea04ead15c2b36c0af81841f",
-    "HevSocks5Tunnel": "35622e4517760a07549389f372f374300ee35113b2c6425010433bb8c42950df",
+    "HevSocks5Tunnel": "b0b140415a3e7b0509a06c4a4eced3e8a7b3174127a0debde981ea6c8e644a7d",
     "WireGuardKitGo": "b077fe5db065df3a350ff0d2b7e34fdf8d8fdeb95522e33a5d2b2066a7f3fcb5",
 ]
 

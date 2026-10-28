@@ -35,7 +35,7 @@ Anything else needs NORSE Labs' written permission. The third-party code the SDK
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/norselabs/dvpnsdk-apple", from: "0.3.0"),
+    .package(url: "https://github.com/norselabs/dvpnsdk-apple", from: "0.4.0"),
 ]
 ```
 

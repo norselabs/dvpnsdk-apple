@@ -5,6 +5,11 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ## Unreleased
 
+## 0.4.0 (2026-10-28)
+
+The `HevSocks5Tunnel` engine is new, hev-socks5-tunnel 2.19.3 (see *Fixed*); the other engines are those of 0.1.0.
+The API changed: see *Changed*.
+
 ### Added
 
 - `Server.address`: the node's address on the network (`sentnode…`), when the backend sends one.
