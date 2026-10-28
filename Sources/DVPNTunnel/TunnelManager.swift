@@ -125,6 +125,8 @@ extension TunnelManager {
 
 extension TunnelManager {
     func startWireguard(from credentials: ConnectionCredentials) async throws(TunnelsServiceError) {
+        // Before anything is saved: an app without the WireGuard extension cannot run this node.
+        _ = try requiredDescriptor(for: .wireGuard)
         let service = try await loadService()
 
         if tunnelModel.peersModel.isEmpty { throw .emptyCredentials }
@@ -167,11 +169,14 @@ extension TunnelManager {
             try await service.modify(
                 tunnel: existing,
                 isOnDemandEnabled: true,
-                tunnelConfiguration: tunnelConfiguration
+                tunnelConfiguration: tunnelConfiguration,
+                networkOptions: storage.networkOptions
             )
             tunnel = existing
         } else {
-            tunnel = try await service.add(tunnelConfiguration: tunnelConfiguration, onDemandEnabled: true)
+            tunnel = try await service.add(
+                tunnelConfiguration: tunnelConfiguration, onDemandEnabled: true, networkOptions: storage.networkOptions
+            )
         }
 
         try await activate(tunnel, in: service)
@@ -248,7 +253,7 @@ extension TunnelManager {
             logger.error("Failed to store Xray configuration: \(error.logDescription, privacy: .public)")
             throw .addTunnelFailed(systemError: error)
         }
-        let tunnel = try await service.startProxyTunnel(descriptor, onDemandEnabled: true)
+        let tunnel = try await service.startProxyTunnel(descriptor, onDemandEnabled: true, networkOptions: storage.networkOptions)
         try await activate(tunnel, in: service)
     }
 }
@@ -315,7 +320,8 @@ extension TunnelManager {
     }
 
     func prepareTunnelModel() {
-        tunnelModel.interfaceModel[.name] = configuration.requiredDescriptor(for: .wireGuard).tunnelName
+        // Without the WireGuard extension the model is never saved (`startWireguard` refuses first), so it needs no name.
+        tunnelModel.interfaceModel[.name] = configuration.descriptor(for: .wireGuard)?.tunnelName ?? ""
         if tunnelModel.peersModel.isEmpty {
             tunnelModel.appendEmptyPeer()
         }
