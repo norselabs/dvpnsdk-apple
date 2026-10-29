@@ -6,7 +6,7 @@
 import DVPNCoreKit
 import DVPNWireGuardCore
 import Foundation
-import WireGuardKit
+import WireGuardKitTypes
 
 final class TunnelModel {
     static let keyLengthInBase64 = 44

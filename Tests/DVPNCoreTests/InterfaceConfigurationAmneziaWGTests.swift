@@ -6,7 +6,7 @@
 @testable import DVPNWireGuardCore
 import Foundation
 import Testing
-import WireGuardKit
+import WireGuardKitTypes
 
 struct InterfaceConfigurationAmneziaWGTests {
     private var interface: InterfaceConfiguration {

@@ -7,7 +7,7 @@ import DVPNCoreKit
 import DVPNSDK
 import Foundation
 import NetworkExtension
-import WireGuardKit
+import WireGuardKitTypes
 
 // MARK: - Constants
 

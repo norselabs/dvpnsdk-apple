@@ -5,6 +5,13 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ## Unreleased
 
+### Changed
+
+- The app no longer links the WireGuard engine and its Go runtime, which started at every launch: `DVPNTunnel` and
+  `DVPNWireGuardCore` take WireGuardKit's configuration types from the new target `WireGuardKitTypes`, which links no
+  engine. `WireGuardKit` re-exports it, so an extension that imports `WireGuardKit` changes nothing; an app that
+  imported `WireGuardKit` through `DVPNTunnel` imports `WireGuardKitTypes` instead.
+
 ## 0.4.0 (2026-10-28)
 
 The `HevSocks5Tunnel` engine is new, hev-socks5-tunnel 2.19.3 (see *Fixed*); the other engines are those of 0.1.0.

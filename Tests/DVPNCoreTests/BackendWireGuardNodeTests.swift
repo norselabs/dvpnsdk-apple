@@ -8,7 +8,7 @@ import DVPNSDK
 @testable import DVPNWireGuardCore
 import Foundation
 import Testing
-import WireGuardKit
+import WireGuardKitTypes
 
 /// Regression: the tunnel model is seeded from the last stored configuration. After a manual
 /// AmneziaWG import with a preshared key, backend WireGuard connections inherited that key and the

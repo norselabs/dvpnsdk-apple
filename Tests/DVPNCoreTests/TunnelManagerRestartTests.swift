@@ -8,7 +8,7 @@ import DVPNCoreKit
 import Foundation
 import NetworkExtension
 import Testing
-import WireGuardKit
+import WireGuardKitTypes
 
 /// `TunnelManager.restart()`: a WireGuard tunnel keeps everything but its resolvers, and with nothing stored to start
 /// from the tunnel is left as it is.

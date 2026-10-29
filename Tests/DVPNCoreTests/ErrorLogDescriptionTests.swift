@@ -8,7 +8,7 @@ import DVPNXRayCore
 import Foundation
 import Network
 import Testing
-import WireGuardKit
+import WireGuardKitTypes
 
 /// A log line or a recorded reason names an error by its words, domain and code, never whole: no file path, no Swift
 /// error's values.

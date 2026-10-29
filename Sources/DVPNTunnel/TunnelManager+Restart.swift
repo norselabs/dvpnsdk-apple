@@ -8,7 +8,7 @@ import DVPNHysteriaCore
 import DVPNWireGuardCore
 import DVPNXRayCore
 import Foundation
-import WireGuardKit
+import WireGuardKitTypes
 
 // MARK: - Restart
 

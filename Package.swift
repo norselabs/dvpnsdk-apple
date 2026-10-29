@@ -32,6 +32,19 @@ let wireGuardGo: Target = Context.environment["DVPNSDK_WIREGUARD_GO_STUB"] == ni
     ? engine("WireGuardKitGo")
     : .target(name: "WireGuardKitGo", path: "Tests/WireGuardKitGoStub")
 
+// MARK: - WireGuardKit's two targets
+
+/// The files of `Sources/WireGuardKit` that make up `WireGuardKit`: the adapter, which runs the engine, and what only
+/// the adapter uses. The rest of the folder is `WireGuardKitTypes`, the configuration types, which link no engine, so
+/// an app can use them without one. Both targets keep upstream's folder, so its changes still apply as they are.
+let wireGuardKitAdapterFiles = [
+    "WireGuardAdapter.swift", "PacketTunnelSettingsGenerator.swift", "DNSResolver.swift", "Array+ConcurrentMap.swift",
+    "IPAddress+AddrInfo.swift", "Exports.swift",
+]
+let wireGuardKitTypeFiles = ((try? FileManager.default.contentsOfDirectory(
+    atPath: "\(Context.packageDirectory)/Sources/WireGuardKit"
+)) ?? []).filter { !wireGuardKitAdapterFiles.contains($0) }
+
 // MARK: - Package
 
 let package = Package(
@@ -80,7 +93,7 @@ let package = Package(
                 "DVPNWireGuardCore",
                 "DVPNHysteriaCore",
                 "DVPNSplitTunnelCore",
-                "WireGuardKit",
+                "WireGuardKitTypes",
             ]
         ),
 
@@ -88,7 +101,7 @@ let package = Package(
 
         .target(name: "DVPNCoreKit"),
         .target(name: "DVPNXRayCore", dependencies: ["DVPNCoreKit"]),
-        .target(name: "DVPNWireGuardCore", dependencies: ["DVPNCoreKit", "WireGuardKit"]),
+        .target(name: "DVPNWireGuardCore", dependencies: ["DVPNCoreKit", "WireGuardKitTypes"]),
         .target(name: "DVPNHysteriaCore", dependencies: ["DVPNCoreKit"]),
         .target(name: "DVPNSplitTunnelCore", dependencies: ["DVPNCoreKit"]),
 
@@ -112,9 +125,17 @@ let package = Package(
         // MARK: - WireGuardKit (WireGuard LLC's, from amneziawg-apple; MIT, see Sources/WireGuardKit/COPYING)
 
         .target(
+            name: "WireGuardKitTypes",
+            dependencies: ["WireGuardKitC"],
+            path: "Sources/WireGuardKit",
+            exclude: ["COPYING"] + wireGuardKitAdapterFiles,
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+        .target(
             name: "WireGuardKit",
-            dependencies: ["WireGuardKitC", "WireGuardKitGo"],
-            exclude: ["COPYING"],
+            dependencies: ["WireGuardKitTypes", "WireGuardKitC", "WireGuardKitGo"],
+            exclude: wireGuardKitTypeFiles,
+            sources: wireGuardKitAdapterFiles,
             swiftSettings: [.swiftLanguageMode(.v5)],
             linkerSettings: [.linkedLibrary("resolv")]
         ),
@@ -146,7 +167,7 @@ let package = Package(
                 .linkedFramework("CoreFoundation"),
             ]
         ),
-        .testTarget(name: "WireGuardKitTests", dependencies: ["WireGuardKit"], swiftSettings: [.swiftLanguageMode(.v5)]),
+        .testTarget(name: "WireGuardKitTests", dependencies: ["WireGuardKitTypes"], swiftSettings: [.swiftLanguageMode(.v5)]),
     ],
     swiftLanguageModes: [.v6]
 )

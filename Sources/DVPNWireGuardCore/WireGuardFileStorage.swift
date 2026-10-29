@@ -5,7 +5,7 @@
 
 import DVPNCoreKit
 import Foundation
-import WireGuardKit
+import WireGuardKitTypes
 
 // MARK: - WireGuardFileConfiguration
 

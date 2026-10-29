@@ -6,7 +6,7 @@
 import DVPNCoreKit
 import Foundation
 import NetworkExtension
-import WireGuardKit
+import WireGuardKitTypes
 
 enum TunnelInterfaceField: CaseIterable {
     case name

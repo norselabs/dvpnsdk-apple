@@ -45,7 +45,8 @@ The engines are prebuilt static frameworks, downloaded from this repository's re
 ## Products
 
 A Go engine embeds the Go runtime, and a process can hold only one, so every engine runs in a packet tunnel extension
-of its own, and the app links no engine at all.
+of its own, and the app links no engine at all. `DVPNTunnel` and `DVPNWireGuardCore` take WireGuardKit's configuration
+types from `WireGuardKitTypes`, its part without the engine, which `WireGuardKit` re-exports.
 
 | Product | Linked by | What it holds |
 |---|---|---|

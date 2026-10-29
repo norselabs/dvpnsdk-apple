@@ -7,7 +7,7 @@ import DVPNCoreKit
 import DVPNWireGuardCore
 import Foundation
 import NetworkExtension
-import WireGuardKit
+import WireGuardKitTypes
 
 @MainActor
 final class TunnelsService {

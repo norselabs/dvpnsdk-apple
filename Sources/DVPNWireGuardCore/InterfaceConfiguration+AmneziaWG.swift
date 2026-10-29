@@ -4,7 +4,7 @@
 //
 
 import Foundation
-import WireGuardKit
+import WireGuardKitTypes
 
 // MARK: - AmneziaWGParameterError
 

@@ -2,7 +2,7 @@
 // Copyright © 2018-2023 WireGuard LLC. All Rights Reserved.
 
 import XCTest
-@testable import WireGuardKit
+@testable import WireGuardKitTypes
 
 final class HandshakeFreshnessEvaluatorTests: XCTestCase {
     func testNoPeersIsNotFresh() {

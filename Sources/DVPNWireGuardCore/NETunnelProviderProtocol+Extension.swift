@@ -5,7 +5,7 @@
 
 import DVPNCoreKit
 import NetworkExtension
-import WireGuardKit
+import WireGuardKitTypes
 
 public enum PacketTunnelProviderError: String, Error, Sendable {
     case savedProtocolConfigurationIsInvalid

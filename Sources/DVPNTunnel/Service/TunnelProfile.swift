@@ -6,7 +6,7 @@
 import DVPNWireGuardCore
 import Foundation
 import NetworkExtension
-import WireGuardKit
+import WireGuardKitTypes
 
 // MARK: - TunnelProfile
 
