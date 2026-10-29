@@ -26,12 +26,6 @@ func engine(_ name: String) -> Target {
     )
 }
 
-/// `swift test` links a C stub of the WireGuard engine instead (scripts/test.sh): one test binary holds every test
-/// target, and a binary can hold only one Go runtime, which the Xray tests take with LibXray.
-let wireGuardGo: Target = Context.environment["DVPNSDK_WIREGUARD_GO_STUB"] == nil
-    ? engine("WireGuardKitGo")
-    : .target(name: "WireGuardKitGo", path: "Tests/WireGuardKitGoStub")
-
 // MARK: - WireGuardKit's two targets
 
 /// The files of `Sources/WireGuardKit` that make up `WireGuardKit`: the adapter, which runs the engine, and what only
@@ -146,7 +140,7 @@ let package = Package(
         engine("LibXray"), // scripts/build-libxray.sh
         engine("LibHysteria"), // scripts/build-libhysteria.sh
         engine("HevSocks5Tunnel"), // scripts/build-hev.sh
-        wireGuardGo, // scripts/build-wireguard-go.sh
+        engine("WireGuardKitGo"), // scripts/build-wireguard-go.sh
 
         // MARK: - Tests
 

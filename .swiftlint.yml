@@ -9,7 +9,6 @@ excluded:
   - Sources/WireGuardKit
   - Sources/WireGuardKitC
   - Tests/WireGuardKitTests
-  - Tests/WireGuardKitGoStub
 
 disabled_rules:
   # Strings are made from JSON-encoder output, which is valid UTF-8 by construction; the failable
