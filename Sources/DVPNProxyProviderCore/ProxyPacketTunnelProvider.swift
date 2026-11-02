@@ -70,9 +70,11 @@ open class ProxyPacketTunnelProvider: NEPacketTunnelProvider {
     override open nonisolated(nonsending) func startTunnel(options: [String: NSObject]? = nil) async throws {
         ProxyStartErrorStore.clear()
         let network = NetworkModel.default
+        let host = nodeHost
+        logger.notice("\(NodeAddressStore.startLine(host: host), privacy: .public)")
         // On every platform, for `TunnelManager.connectedNode()`. Before the tunnel's interface appears, so the macOS
         // split-tunnel proxy sees both together.
-        TunnelStateStore.record(isUp: true, server: nodeHost)
+        TunnelStateStore.record(isUp: true, server: host)
 
         do {
             try await setTunnelNetworkSettings(makeNetworkSettings(network: network))

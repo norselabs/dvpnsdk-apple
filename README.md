@@ -231,8 +231,9 @@ the SDK's lines too. A line holds only what may leave the device:
 - **Public:**
   - fixed text, states, enum cases, counts, durations and versions;
   - an error's own words: the SDK's own description, or the system's words with the error's domain and code;
-  - the node's data, the same for every client of that node: its host, IP address, port, certificate pin, a
-    fragment of its public key, its protocol parameters (not its keys), and the errors it returns;
+  - the node's data, the same for every client of that node: its network address (`sentnode…`), host, IP address,
+    port, certificate pin, a fragment of its public key, its protocol parameters (not its keys), and the errors it
+    returns;
   - the host app's own identifiers (bundle and App Group IDs, the VPN profile's name) and the API's fixed paths;
   - a public preset the user picked: a DNS provider from the list, a split-tunnel mode, obfuscation on or off.
 - **Private, and only in a debug line that needs it:** the apps the user runs.

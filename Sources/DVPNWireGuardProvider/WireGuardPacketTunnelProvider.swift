@@ -50,9 +50,11 @@ open class WireGuardPacketTunnelProvider: NEPacketTunnelProvider {
             throw PacketTunnelProviderError.savedProtocolConfigurationIsInvalid
         }
 
+        let host = tunnelConfiguration.peers.first?.endpoint.map { "\($0.host)" }
+        logger.notice("\(NodeAddressStore.startLine(host: host), privacy: .public)")
         // On every platform, for `TunnelManager.connectedNode()`. Before the tunnel's interface appears, so the macOS
         // split-tunnel proxy sees both together; the node it connects to is left out of the proxy.
-        TunnelStateStore.record(isUp: true, server: tunnelConfiguration.peers.first?.endpoint.map { "\($0.host)" })
+        TunnelStateStore.record(isUp: true, server: host)
         do {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
                 adapter.start(tunnelConfiguration: tunnelConfiguration) { adapterError in

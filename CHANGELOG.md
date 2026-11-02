@@ -5,6 +5,11 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ## Unreleased
 
+### Added
+
+- A start's log lines name the node's network address (`sentnode…`), or "no node address" when the credentials carry
+  none: `TunnelManager.start(from:)`'s, with the node type and host, and each packet tunnel provider's, with the host.
+
 ### Changed
 
 - The app no longer links the WireGuard engine and its Go runtime, which started at every launch: `DVPNTunnel` and

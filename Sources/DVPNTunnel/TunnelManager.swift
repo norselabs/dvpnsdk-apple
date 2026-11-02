@@ -92,6 +92,7 @@ extension TunnelManager {
     /// Starts the tunnel engine that serves the credentials' node type. Returns once connected (and,
     /// for the WireGuard family, once the first handshake is seen).
     public func start(from credentials: ConnectionCredentials) async throws(TunnelsServiceError) {
+        recordNode(of: credentials)
         switch credentials.nodeType.tunnelProtocolID {
         case .wireGuard:
             try await startWireguard(from: credentials)
