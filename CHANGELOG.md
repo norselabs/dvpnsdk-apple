@@ -29,6 +29,8 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 - Through the Xray and Hysteria tunnels, a TCP connection that carries nothing either way is reset after 5 minutes
   instead of 1, Xray's own idle limit, so an SSH session without keepalives, a websocket that pings less than once a
   minute or a long poll survives a quiet minute. A UDP association still ends after a quiet minute.
+- The Xray and Hysteria profiles no longer set `excludeLocalNetworks`. It takes effect only with `includeAllNetworks`
+  or `enforceRoutes`, which the SDK sets on no profile, so local traffic stays outside the tunnel as before.
 
 ### Fixed
 

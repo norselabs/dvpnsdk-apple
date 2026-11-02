@@ -128,9 +128,6 @@ extension TunnelsService {
             protocolConfiguration.providerBundleIdentifier = descriptor.providerBundleID
             protocolConfiguration.serverAddress = descriptor.tunnelName
             protocolConfiguration.providerConfiguration = [:]
-#if !os(tvOS)
-            protocolConfiguration.excludeLocalNetworks = true
-#endif
             return protocolConfiguration
         }()
         manager.isEnabled = onDemandEnabled
