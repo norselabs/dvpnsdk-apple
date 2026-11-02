@@ -242,8 +242,7 @@ the SDK's lines too. A line holds only what may leave the device:
   - anything about the user: their own or tunnel address, device or account IDs, file paths, the destinations they
     visit and their DNS queries, settings beyond public presets;
   - an error printed whole, a request's query, headers or body, or a response body;
-  - an engine's own traffic log, on standard output and standard error too. Until the next engine build, libhysteria
-    still writes a failed proxied connection's destination to standard error, which an extension discards.
+  - an engine's own traffic log, on standard output and standard error too.
 
 How the SDK keeps to it: every error goes through one helper (`logDescription`; in `DVPNSDK`, the transport's
 `describeFailure`), and lint stops an error being logged whole. Before Xray's or Hysteria's start error is logged or

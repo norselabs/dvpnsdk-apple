@@ -11,6 +11,8 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   `DVPNWireGuardCore` take WireGuardKit's configuration types from the new target `WireGuardKitTypes`, which links no
   engine. `WireGuardKit` re-exports it, so an extension that imports `WireGuardKit` changes nothing; an app that
   imported `WireGuardKit` through `DVPNTunnel` imports `WireGuardKitTypes` instead.
+- LibHysteria no longer writes a failed proxied connection's destination to standard error, and WireGuardKitGo no
+  longer logs the stacks of all its goroutines when the process gets `SIGUSR2`.
 
 ## 0.4.0 (2026-10-28)
 

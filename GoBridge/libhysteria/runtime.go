@@ -64,7 +64,7 @@ func Start(configJSON string) error {
 		HyClient:    hyClient,
 		AuthFunc:    cfg.SOCKS5.authFunc(),
 		DisableUDP:  !cfg.SOCKS5.UDP,
-		EventLogger: stderrLogger{},
+		EventLogger: silentLogger{},
 	}
 	inst := &instance{client: hyClient, listener: listener, done: make(chan struct{})}
 	go func() {
@@ -110,21 +110,14 @@ func Version() string {
 	return version
 }
 
-// stderrLogger writes failed SOCKS5 connections to standard error, which an extension discards.
-type stderrLogger struct{}
+// silentLogger drops the SOCKS5 server's connection events: they name the destinations the user visits, and their
+// errors quote them (README › Logs).
+type silentLogger struct{}
 
-func (stderrLogger) TCPRequest(addr net.Addr, reqAddr string) {}
+func (silentLogger) TCPRequest(addr net.Addr, reqAddr string) {}
 
-func (stderrLogger) TCPError(addr net.Addr, reqAddr string, err error) {
-	if err != nil {
-		log.Printf("libhysteria: tcp %s -> %s: %v", addr, reqAddr, err)
-	}
-}
+func (silentLogger) TCPError(addr net.Addr, reqAddr string, err error) {}
 
-func (stderrLogger) UDPRequest(addr net.Addr) {}
+func (silentLogger) UDPRequest(addr net.Addr) {}
 
-func (stderrLogger) UDPError(addr net.Addr, err error) {
-	if err != nil {
-		log.Printf("libhysteria: udp %s: %v", addr, err)
-	}
-}
+func (silentLogger) UDPError(addr net.Addr, err error) {}
