@@ -1,8 +1,9 @@
 #!/bin/sh
 # Checks the engines in Frameworks/ before they are used or released: each has the five slices, each slice holds
 # the engine it is named after, and none links code this package keeps out of them — GPL or LGPL libraries, and in
-# LibXray what GoBridge/xray-core removes. The build scripts run it after a build, and scripts/check.sh and
-# scripts/make-release-assets.sh before using what is there, so an engine built from the unpatched sources is caught.
+# LibXray what GoBridge/xray-core removes; WireGuardKitGo runs on the patched Go runtime. The build scripts run it
+# after a build, and scripts/check.sh and scripts/make-release-assets.sh before using what is there, so an engine
+# built from the unpatched sources is caught.
 #
 #   scripts/check-frameworks.sh [LibXray|LibHysteria|HevSocks5Tunnel|WireGuardKitGo]...   (default: all four)
 set -eu
@@ -65,6 +66,9 @@ verify() {
         contains "$binary" "$signature" || die "$framework/$slice does not look like $engine (no $signature)"
         refuse "$binary" "$framework/$slice" "$FORBIDDEN_EVERYWHERE"
         [ "$engine" != LibXray ] || refuse "$binary" "$framework/$slice" "$FORBIDDEN_IN_XRAY"
+        # GoBridge/wireguard's runtime patch makes Go's clock count the time the device slept.
+        [ "$engine" != WireGuardKitGo ] || contains "$binary" _mach_continuous_time ||
+            die "$framework/$slice runs on a Go runtime without GoBridge/wireguard's patch: run scripts/$script"
     done
     echo "$framework: $(echo "$EXPECTED_SLICES" | wc -w | tr -d ' ') slices, nothing it must not link"
 }

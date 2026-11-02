@@ -18,6 +18,11 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 - The Go engines (LibXray, LibHysteria, WireGuardKitGo) are built with Go 1.27.3 instead of 1.27.1, for its
   standard library's security fixes and two compiler fixes.
 
+### Fixed
+
+- WireGuardKitGo's timers count the time the device slept, as its patched Go runtime intends. Up to 0.4.0 the build
+  used the downloaded Go toolchain instead of the patched copy, so the patch never reached the engine.
+
 ## 0.4.0 (2026-10-28)
 
 The `HevSocks5Tunnel` engine is new, hev-socks5-tunnel 2.19.3 (see *Fixed*); the other engines are those of 0.1.0.

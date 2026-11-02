@@ -1,8 +1,8 @@
 #!/bin/sh
 # Builds Frameworks/WireGuardKitGo.xcframework, the amneziawg-go engine WireGuardKit drives, from
-# GoBridge/wireguard (amneziawg-apple's Go bridge: its Makefile patches a copy of the Go runtime so timers
-# count the time the device slept, then builds a cgo c-archive). amneziawg-go is a superset of
-# wireguard-go: a WireGuard configuration without AmneziaWG keys behaves as plain WireGuard.
+# GoBridge/wireguard (amneziawg-apple's Go bridge: its Makefile patches a copy of the pinned Go toolchain
+# so timers count the time the device slept, then builds a cgo c-archive with that copy). amneziawg-go is
+# a superset of wireguard-go: a WireGuard configuration without AmneziaWG keys behaves as plain WireGuard.
 #
 # Output slices: ios-arm64, ios-arm64_x86_64-simulator, macos-arm64_x86_64, tvos-arm64,
 # tvos-arm64_x86_64-simulator, as static frameworks; Swift imports the result as `WireGuardKitGo`.
@@ -73,7 +73,8 @@ scripts/check-frameworks.sh WireGuardKitGo
 AMNEZIAWG="$(cd "$MODULE_DIR" && go list -m -f '{{.Version}}' github.com/amnezia-vpn/amneziawg-go/v3)"
 {
     echo "amneziawg-go: $AMNEZIAWG"
-    echo "go: $(go version), runtime patched with $(cd "$MODULE_DIR" && ls goruntime-*.diff)"
+    # The version of the patched copy the Makefile built with, not of the go on the PATH.
+    echo "go: $(GOTOOLCHAIN=local "$BUILD_DIR/tmp/iphoneos/wireguard-go-bridge/goroot/bin/go" version), runtime patched with $(cd "$MODULE_DIR" && ls goruntime-*.diff)"
     echo "built: $(date -u +%FT%TZ)"
 } > "$ROOT/Frameworks/WireGuardKitGo.version"
 

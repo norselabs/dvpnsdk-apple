@@ -44,7 +44,9 @@ version-header: $(DESTDIR)/wireguard-go-version.h
 # $(shell) does not see Makefile exports on macOS make, so pass the toolchain explicitly.
 REAL_GOROOT := $(shell GOTOOLCHAIN=$(GOTOOLCHAIN) go env GOROOT 2>/dev/null)
 export GOROOT := $(BUILDDIR)/goroot
-$(GOROOT)/.prepared:
+# The copy's marker names the toolchain, so a new pin copies its runtime afresh.
+PREPARED := $(GOROOT)/.prepared-$(GOTOOLCHAIN)
+$(PREPARED):
 	[ -n "$(REAL_GOROOT)" ]
 	mkdir -p "$(GOROOT)"
 	# The downloaded toolchain lives in the read-only module cache: an earlier copy must be made
@@ -55,19 +57,21 @@ $(GOROOT)/.prepared:
 	cat goruntime-*.diff | patch -p1 -f -N -r- -d "$(GOROOT)"
 	touch "$@"
 
+# The build runs the patched copy's own go: a go of another version hands a pinned toolchain's build to the
+# downloaded toolchain, which ignores GOROOT, and the runtime patch would not apply.
 define libwg-go-a
 $(BUILDDIR)/libwg-go-$(1).a: export CGO_ENABLED := 1
 $(BUILDDIR)/libwg-go-$(1).a: export CGO_CFLAGS := $(CFLAGS_PREFIX) $(ARCH)
 $(BUILDDIR)/libwg-go-$(1).a: export CGO_LDFLAGS := $(CFLAGS_PREFIX) $(ARCH)
 $(BUILDDIR)/libwg-go-$(1).a: export GOOS := $(GOOS_$(PLATFORM_NAME))
 $(BUILDDIR)/libwg-go-$(1).a: export GOARCH := $(GOARCH_$(1))
-$(BUILDDIR)/libwg-go-$(1).a: $(GOROOT)/.prepared go.mod
-	go build -ldflags=-w -trimpath -v -o "$(BUILDDIR)/libwg-go-$(1).a" -buildmode c-archive
+$(BUILDDIR)/libwg-go-$(1).a: $(PREPARED) go.mod
+	GOTOOLCHAIN=local "$(GOROOT)/bin/go" build -ldflags=-w -trimpath -v -o "$(BUILDDIR)/libwg-go-$(1).a" -buildmode c-archive
 	rm -f "$(BUILDDIR)/libwg-go-$(1).h"
 endef
 $(foreach ARCH,$(ARCHS),$(eval $(call libwg-go-a,$(ARCH))))
 
-$(DESTDIR)/wireguard-go-version.h: go.mod $(GOROOT)/.prepared
+$(DESTDIR)/wireguard-go-version.h: go.mod $(PREPARED)
 	 sed -E -n 's/.*golang\.zx2c4\.com\/wireguard +v[0-9.]+-[0-9]+-([0-9a-f]{8})[0-9a-f]{4}.*/#define WIREGUARD_GO_VERSION "\1"/p' "$<" > "$@"
 
 $(DESTDIR)/libwg-go.a: $(foreach ARCH,$(ARCHS),$(BUILDDIR)/libwg-go-$(ARCH).a)
