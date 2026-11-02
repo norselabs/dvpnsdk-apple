@@ -2,9 +2,6 @@
 # Generates the patched copies of Xray-core and REALITY that LibXray is built with, so it links no
 # GPL or LGPL code and no config loader it does not use:
 #
-# - Xray-core without Shadowsocks 2022: upstream links github.com/sagernet/sing and sing-shadowsocks
-#   (GPL-3.0-or-later) for it alone (proxy/shadowsocks_2022, common/singbridge); the SDK never uses
-#   it (DVPNXRayCore renders VMess, VLESS and Trojan).
 # - Xray-core without its YAML and TOML config loaders (main/yaml, main/toml): libXray passes JSON
 #   only, and the loaders link two YAML libraries and go-toml.
 # - REALITY without its fallback rate limiter: it is built on github.com/juju/ratelimit (LGPL-3.0),
@@ -91,8 +88,7 @@ LIBXRAY_VERSION=$(sed -n 's/^DEFAULT_XRAY_CORE_VERSION = "\(.*\)"$/\1/p' "$LIBXR
     exit 1
 }
 sync_module "$XRAY" "$XRAY_VERSION" "$XRAY_HASH" GoBridge/xray-core "$OUT/Xray-core" \
-    proxy/shadowsocks_2022 common/singbridge main/toml main/yaml -- github.com/sagernet/sing \
-    github.com/sagernet/sing-shadowsocks github.com/juju/ratelimit github.com/ghodss/yaml github.com/pelletier/go-toml
+    main/toml main/yaml -- github.com/juju/ratelimit github.com/ghodss/yaml github.com/pelletier/go-toml
 
 REALITY=github.com/xtls/reality
 set -- $(pinned GoBridge/reality/reality.sum "$REALITY")
@@ -105,11 +101,9 @@ sync_module "$REALITY" "$REALITY_VERSION" "$REALITY_HASH" GoBridge/reality "$OUT
     -- github.com/juju/ratelimit
 
 # Imports and module lines only: some comments name other projects' modules.
-if grep -rl -E --include='*.go' \
-    '"github.com/(sagernet/|juju/ratelimit)|"github.com/xtls/xray-core/(proxy/shadowsocks_2022|common/singbridge)' \
-    "$OUT/Xray-core" "$OUT/REALITY" ||
+if grep -rl -E --include='*.go' '"github.com/(sagernet/|juju/ratelimit)' "$OUT/Xray-core" "$OUT/REALITY" ||
     grep -l -E '(^|[[:space:]])github.com/(sagernet/|juju/ratelimit)' \
     "$OUT/Xray-core/go.mod" "$OUT/Xray-core/go.sum" "$OUT/REALITY/go.mod" "$OUT/REALITY/go.sum"; then
-    echo "the files above still reference sing, sing-shadowsocks, juju/ratelimit or the removed packages: extend the patches" >&2
+    echo "the files above still reference sing, sing-shadowsocks or juju/ratelimit: extend the patches" >&2
     exit 1
 fi

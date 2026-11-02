@@ -217,9 +217,9 @@ so the result is the same as with the SDK's own client.
   signed it.
 - **Backend nodes carry no certificate.** At each start the Xray extension handshakes with the node once and pins the
   certificate it presented, or uses plaintext when no TLS handshake completes.
-- **No GPL code in the engines.** LibXray is built on Xray-core without Shadowsocks 2022 and without its YAML and TOML
-  config loaders, and on REALITY without its fallback rate limiter (`GoBridge/`); `GoBridge/nogpl` checks the licence of
-  every linked Go module, and each build writes a licence inventory for your app's acknowledgements.
+- **No GPL code in the engines.** LibXray is built on Xray-core without its YAML and TOML config loaders, and on
+  REALITY without its fallback rate limiter (`GoBridge/`); `GoBridge/nogpl` checks the licence of every linked Go
+  module, and each build writes a licence inventory for your app's acknowledgements.
 - **On tvOS** the configuration files live under the App Group's `Library/Caches`, the only place the sandbox allows;
   the app writes them again at every connect.
 

@@ -16,8 +16,7 @@ EXPECTED_SLICES="ios-arm64 ios-arm64_x86_64-simulator macos-arm64_x86_64 tvos-ar
 FORBIDDEN_EVERYWHERE='github.com/sagernet/|GPL-3.0 (sing, sing-shadowsocks)
 github.com/juju/ratelimit|LGPL-3.0'
 # Strings LibXray may not contain, removed by the patches in GoBridge/xray-core.
-FORBIDDEN_IN_XRAY='xray-core/proxy/shadowsocks_2022|Shadowsocks 2022, removed by no-shadowsocks-2022.patch
-github.com/pelletier/go-toml|the TOML config loader, removed by no-yaml-toml.patch
+FORBIDDEN_IN_XRAY='github.com/pelletier/go-toml|the TOML config loader, removed by no-yaml-toml.patch
 github.com/ghodss/yaml|the YAML config loader, removed by no-yaml-toml.patch'
 
 die() {

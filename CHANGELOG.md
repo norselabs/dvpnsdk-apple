@@ -17,6 +17,8 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   `SIGBUS` handlers ran in front of the Go engines' own and faulted on any thread but hev's.
 - The Go engines (LibXray, LibHysteria, WireGuardKitGo) are built with Go 1.27.3 instead of 1.27.1, for its
   standard library's security fixes and two compiler fixes.
+- LibXray is built from libXray v26.10.31 with Xray-core 26.10.31 instead of 26.9.9, and no longer leaves out
+  Shadowsocks 2022, which is now Xray-core's own code instead of the GPL `sing-shadowsocks`.
 
 ### Fixed
 
