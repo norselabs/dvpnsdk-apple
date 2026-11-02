@@ -1,8 +1,8 @@
 #!/bin/sh
 # Builds Frameworks/LibXray.xcframework from XTLS/libXray (cgo c-archive mode), on the copies of
-# Xray-core (without the YAML and TOML config loaders, which libXray never uses) and REALITY (without
-# its fallback rate limiter, which links LGPL-3.0 code) that scripts/sync-patched-modules.sh
-# generates. GoBridge/nogpl checks the licence of every linked module before
+# Xray-core (without the YAML and TOML config loaders, which libXray never uses, and with its timeout
+# reader fixed) and REALITY (without its fallback rate limiter, which links LGPL-3.0 code) that
+# scripts/sync-patched-modules.sh generates. GoBridge/nogpl checks the licence of every linked module before
 # the build and writes their inventory (Frameworks/LibXray.licenses.json, for an app's licences list),
 # and scripts/check-frameworks.sh checks the binaries after it.
 #
@@ -70,8 +70,8 @@ XRAY_CORE="$(cd "$SRC" && go list -m -f '{{.Version}}' github.com/xtls/xray-core
 REALITY="$(cd "$SRC" && go list -m -f '{{.Version}}' github.com/xtls/reality)"
 {
     echo "libXray: $LIBXRAY_REF ($(git -C "$SRC" rev-parse --short HEAD))"
-    echo "xray-core: $XRAY_CORE without the YAML and TOML config loaders (GoBridge/xray-core)"
-    echo "reality: $REALITY without the fallback rate limiter (GoBridge/reality)"
+    echo "xray-core: $XRAY_CORE with $(cd GoBridge/xray-core && ls *.patch | paste -sd ' ' -) (GoBridge/xray-core)"
+    echo "reality: $REALITY with $(cd GoBridge/reality && ls *.patch | paste -sd ' ' -) (GoBridge/reality)"
     echo "go: $(go version)"
     echo "built: $(date -u +%FT%TZ)"
 } > Frameworks/LibXray.version

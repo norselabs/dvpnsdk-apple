@@ -26,6 +26,10 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 - WireGuardKitGo's timers count the time the device slept, as its patched Go runtime intends. Up to 0.4.0 the build
   used the downloaded Go toolchain instead of the patched copy, so the patch never reached the engine.
+- LibXray's VMess outbound no longer ends the request of an app that sends nothing in its first 0.3 s, such as a mail,
+  FTP or database client waiting for the server's greeting: the node dropped what the app sent next and closed the
+  connection. Xray-core's timeout reader now returns `buf.ErrReadTimeout` when its wait runs out, as its pipe reader
+  does.
 
 ## 0.4.0 (2026-10-28)
 

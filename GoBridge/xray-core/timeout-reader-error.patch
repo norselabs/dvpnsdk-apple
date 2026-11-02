@@ -1,0 +1,12 @@
+--- a/common/buf/io.go
++++ b/common/buf/io.go
+@@ -73,7 +73,8 @@
+ 		}
+ 		return r.mb, r.err
+ 	case <-timeout:
+-		return nil, nil
++		// As the pipe reader does: no data with no error reads as an empty payload, which ends a VMess request.
++		return nil, ErrReadTimeout
+ 	}
+ }
+ 
