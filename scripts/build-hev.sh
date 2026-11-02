@@ -15,6 +15,11 @@
 # common symbol an alignment derived from its size, up to 32 KB, which exceeds the 16 KB segment
 # alignment; every consumer then logs "reducing alignment of section __DATA,__common from 0x8000
 # to 0x4000" when linking. Regular zero-filled globals keep the compiler's alignment instead.
+#
+# hev-task-system is built without its stack-overflow detector (TPFLAGS, which replaces the value
+# hev-socks5-tunnel's Makefile passes it; the slice allocator stays off, as there). The detector
+# installs process-wide SIGSEGV and SIGBUS handlers when the tunnel starts, in front of the Go
+# engines' own, and its handler faults on any thread but hev's before it passes the signal on.
 set -euo pipefail
 
 HEV_TAG="2.19.3"
@@ -68,6 +73,7 @@ build() {
         PP="$clang" CC="$clang" AR="xcrun --sdk $sdk ar" \
         CFLAGS="-arch $arch $min -fno-common" \
         LFLAGS="-arch $arch $min" \
+        TPFLAGS="ENABLE_MEMALLOC_SLICE=0 ENABLE_STACK_OVERFLOW_DETECTOR=0" \
         static >/dev/null
     mkdir -p "$SLICES/$slice/archs"
     xcrun libtool -static -no_warning_for_no_symbols -o "$SLICES/$slice/archs/$arch.a" \
