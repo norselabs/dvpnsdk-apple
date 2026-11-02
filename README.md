@@ -217,6 +217,10 @@ so the result is the same as with the SDK's own client.
   signed it.
 - **Backend nodes carry no certificate.** At each start the Xray extension handshakes with the node once and pins the
   certificate it presented, or uses plaintext when no TLS handshake completes.
+- **The proxy tunnels leave IPv6 out, on purpose.** The Xray and Hysteria tunnels claim the IPv4 default route and no
+  IPv6 one, so while they run the system routes no IPv6 traffic and apps fall back to IPv4. A provider subclass whose
+  `makeNetworkSettings(network:)` claims `::/0` gets IPv6 connections that open on the device, then close at every
+  node without IPv6.
 - **No GPL code in the engines.** LibXray is built on Xray-core without its YAML and TOML config loaders, and on
   REALITY without its fallback rate limiter (`GoBridge/`); `GoBridge/nogpl` checks the licence of every linked Go
   module, and each build writes a licence inventory for your app's acknowledgements.
