@@ -274,8 +274,9 @@ zips the four frameworks and writes their checksums and `binaryRelease` into `Pa
 ## Working on it
 
 - `scripts/bootstrap.sh` enables the pre-commit hook (SwiftFormat and SwiftLint on staged files).
-- `scripts/check.sh [--fix] [--platforms]` before pushing: formatting, lint, the Go checks, the engines' licence check,
-  the tests, and with `--platforms` an `xcodebuild` of every target for iOS Simulator, macOS and tvOS Simulator.
+- `scripts/check.sh [--fix] [--platforms]` before pushing: formatting and lint with the SwiftFormat and SwiftLint
+  versions it pins, the Go checks, the engines' licence check, the tests, and with `--platforms` an `xcodebuild` of every
+  target for iOS Simulator, macOS and tvOS Simulator.
 - `scripts/test.sh` runs the tests alone. They need no network or device.
 
 ## Licences

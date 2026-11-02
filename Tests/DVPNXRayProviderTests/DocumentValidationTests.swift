@@ -137,11 +137,15 @@ extension LibXrayTests {
             }
             let reality = XSecurity.reality(.init(serverName: "www.microsoft.com", publicKey: publicKey, shortId: "0123ab"))
             try assertBuilds(
-                XConfigurationModel(outbound: outbounds(address: "example.com")[1], transport: .tcp(.init()), security: reality, obfuscation: fragment)
+                XConfigurationModel(
+                    outbound: outbounds(address: "example.com")[1], transport: .tcp(.init()), security: reality, obfuscation: fragment
+                )
             )
             // Plaintext streams carry the dialer too; `tlshello` simply never matches.
             try assertBuilds(
-                XConfigurationModel(outbound: outbounds(address: "192.168.1.10")[0], transport: .tcp(.init()), security: .none, obfuscation: fragment)
+                XConfigurationModel(
+                    outbound: outbounds(address: "192.168.1.10")[0], transport: .tcp(.init()), security: .none, obfuscation: fragment
+                )
             )
         }
 

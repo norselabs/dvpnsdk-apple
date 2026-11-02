@@ -123,7 +123,8 @@ extension SNISpoofTransport {
         let algorithm: SecKeyAlgorithm
     }
 
-    // One guard per DER tag on the way to the signature.
+    // One guard per DER tag on the way to the signature, which SwiftFormat's repeatedGuard (0.64.0 on) flags.
+    // swiftformat:disable repeatedGuard
     // swiftlint:disable:next cyclomatic_complexity
     static func parseX509Signature(_ certData: Data) -> X509Signature? {
         var offset = 0
@@ -156,6 +157,8 @@ extension SNISpoofTransport {
 
         return X509Signature(tbs: Data(tbsCertificate), signature: Data(signature), algorithm: algorithm)
     }
+
+    // swiftformat:enable repeatedGuard
 
     // MARK: - ASN.1 helpers
 

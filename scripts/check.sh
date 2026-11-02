@@ -26,17 +26,27 @@ if [[ -d /Applications/Xcode.app ]]; then
 fi
 LOGS=.build/check
 mkdir -p "$LOGS"
+# The SwiftFormat and SwiftLint the code is checked with. A newer release can flag code nobody touched, so another
+# version stops the check before it reads any code; a pin moves in a commit with the changes the new version asks for.
+SWIFTFORMAT_VERSION=0.63.0
+SWIFTLINT_VERSION=0.59.1
 
 step() { step_started=$SECONDS; printf '\n\033[1m▶ %s\033[0m\n' "$*"; }
 fail() { printf '\033[31m✗ %s\033[0m\n' "$*" >&2; exit 1; }
 pass() { printf '\033[32m✓ %s\033[0m (%ss)\n' "$*" $((SECONDS - step_started)); }
+# require_pinned NAME PINNED INSTALLED
+require_pinned() {
+  [[ $3 == "$2" ]] || fail "$1 $2 is pinned and ${3:-no version} is installed: install $2, or move the pin in scripts/check.sh with the code changes the new version asks for"
+}
 
 step "Format"
+require_pinned SwiftFormat "$SWIFTFORMAT_VERSION" "$(swiftformat --version 2>/dev/null || true)"
 $fix && swiftformat Sources Tests --quiet
 swiftformat Sources Tests --lint --quiet || fail "SwiftFormat found unformatted code: run scripts/check.sh --fix"
 pass "SwiftFormat"
 
 step "Lint"
+require_pinned SwiftLint "$SWIFTLINT_VERSION" "$(swiftlint version 2>/dev/null || true)"
 swiftlint lint --strict --quiet || fail "SwiftLint found violations (each rule's message says what to do)"
 pass "SwiftLint"
 
