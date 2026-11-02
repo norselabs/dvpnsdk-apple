@@ -31,6 +31,9 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   minute or a long poll survives a quiet minute. A UDP association still ends after a quiet minute.
 - The Xray and Hysteria profiles no longer set `excludeLocalNetworks`. It takes effect only with `includeAllNetworks`
   or `enforceRoutes`, which the SDK sets on no profile, so local traffic stays outside the tunnel as before.
+- `MirroredTransport` logs at the notice level, which the system keeps, instead of debug, when a request waits for the
+  backend or a mirror that has started its answer instead of handing the request over, and when it found no mirror to
+  take over from a silent backend.
 
 ### Fixed
 

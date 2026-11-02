@@ -98,7 +98,7 @@ extension MirroredTransport {
             let silence = silence
             guard !isMirrorAsked else { return .wait }
             guard !primaryHasStarted() else {
-                log.debug("send [\(path, privacy: .public)] primary started — waiting for its answer")
+                log.notice("send [\(path, privacy: .public)] primary started — waiting for its answer")
                 return .wait
             }
             log.notice("send [\(path, privacy: .public)] primary silent for \(silence) s — looking for a mirror")
@@ -119,8 +119,12 @@ extension MirroredTransport {
                 isMirrorAsked = true
                 return .askMirror
             }
-            guard foundMirror, !primaryHasStarted() else {
-                log.debug("send [\(path, privacy: .public)] no mirror to take over, or the primary started — waiting for the primary")
+            guard foundMirror else {
+                log.notice("send [\(path, privacy: .public)] no mirror to take over — waiting for the primary")
+                return .wait
+            }
+            guard !primaryHasStarted() else {
+                log.notice("send [\(path, privacy: .public)] primary started — waiting for its answer")
                 return .wait
             }
             if request.target.method == .get {
@@ -293,7 +297,7 @@ extension MirroredTransport {
                 }
                 return .askPrimary
             case .sending where mirrorProgress.hasStarted:
-                log.debug("send [\(path, privacy: .public)] mirror started — waiting for its answer")
+                log.notice("send [\(path, privacy: .public)] mirror started — waiting for its answer")
                 return .wait
             case .sending where request.target.method == .get:
                 log.notice("send [\(path, privacy: .public)] mirror silent for \(silence) s — asking the primary too")
