@@ -20,12 +20,20 @@ public enum TunnelConfigDirectories {
         return url
     }
 
-    /// Root of the tunnel configuration files inside the App Group container.
-    ///
+    /// Root of the tunnel configuration files: inside the App Group container, or the directory a test task keeps them in.
+    package static var homeDirectory: URL? {
+        guard let homeDirectoryOverride else { return appGroupHomeDirectory }
+        return try? createDirectory(at: homeDirectoryOverride)
+    }
+
+    /// Where the configuration files go for the task that sets it, instead of the App Group container, which a test
+    /// process cannot write. Only that task and its child tasks see it, so the tests running beside it keep theirs.
+    @TaskLocal package static var homeDirectoryOverride: URL?
+
     /// tvOS only lets apps write to `Library/Caches` (and `tmp`) inside their containers and treats the
     /// data as purgeable; creating `Library/Application Support` there fails. The app rewrites every
     /// config file right before it activates a tunnel, so a purge costs nothing but one reconnect.
-    package static let homeDirectory: URL? = {
+    private static let appGroupHomeDirectory: URL? = {
         guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: TunnelEnvironment.appGroupID) else {
             logger.error("No App Group container for \(TunnelEnvironment.appGroupID, privacy: .public)")
             return nil

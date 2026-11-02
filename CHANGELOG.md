@@ -35,6 +35,10 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   FTP or database client waiting for the server's greeting: the node dropped what the app sent next and closed the
   connection. Xray-core's timeout reader now returns `buf.ErrReadTimeout` when its wait runs out, as its pipe reader
   does.
+- A WireGuard or AmneziaWG start after an Xray or Hysteria one, from credentials that make the same configuration as
+  the WireGuard tunnel's before, ran the proxy engine again: the profile kept pointing at its extension, so its last
+  node ran, the start reported success, and a proxy tunnel still up was not stopped. The start now points the profile
+  back at the WireGuard extension and stops the running tunnel first.
 
 ## 0.4.0 (2026-10-28)
 

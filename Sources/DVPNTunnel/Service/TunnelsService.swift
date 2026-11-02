@@ -207,9 +207,9 @@ extension TunnelsService {
         }
     }
 
-    /// Saves a new configuration. If the tunnel is live and the configuration changed, the tunnel is
-    /// stopped so the changes take effect; the method returns once it is `.disconnected` and the caller
-    /// is expected to `startActivation(of:)` again.
+    /// Saves a new configuration, on the WireGuard extension. If the tunnel is live and the configuration or the extension
+    /// changed, the tunnel is stopped so the changes take effect; the method returns once it is `.disconnected` and the
+    /// caller is expected to `startActivation(of:)` again.
     func modify(
         tunnel: TunnelContainer,
         isOnDemandEnabled: Bool,
@@ -230,7 +230,10 @@ extension TunnelsService {
             }
         }
 
-        let isTunnelConfigurationChanged = manager.tunnelConfiguration != tunnelConfiguration
+        // A proxy start leaves the WireGuard file as it was, so the same configuration can come back while the profile
+        // still points at the proxy's extension.
+        let isTunnelConfigurationChanged = manager.provider?.tunnelProtocolID != .wireGuard
+            || manager.tunnelConfiguration != tunnelConfiguration
         if isTunnelConfigurationChanged {
             manager.set(tunnelConfiguration: tunnelConfiguration)
         }
