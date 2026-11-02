@@ -1,5 +1,5 @@
-// Vendored from github.com/apernet/hysteria app/internal/socks5/server.go at tag app/v2.12.2
-// (commit 619a6f856b69fb7ee6a7a379e810e68b84004605), MIT License, Copyright (c) 2023 Toby.
+// Vendored from github.com/apernet/hysteria app/internal/socks5/server.go at tag app/v2.13.0
+// (commit ca8fbd874fd6ca82413948de6dc5924405e103e1), MIT License, Copyright (c) 2023 Toby.
 // The package is internal upstream, so it cannot be imported; it is copied verbatim and only
 // used with a client.Client from core/v2.
 package socks5
