@@ -20,7 +20,7 @@ BUILD_DIR="$ROOT/.build/wireguard-go"
 OUT="$ROOT/Frameworks/WireGuardKitGo.xcframework"
 LIB="libwg-go.a"
 
-export GOTOOLCHAIN="${GO_TOOLCHAIN:-go1.27.1}"
+export GOTOOLCHAIN="${GO_TOOLCHAIN:-go1.27.3}"
 export GOFLAGS="${GOFLAGS:--mod=mod}"
 export PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"
 if [ -d "/Applications/Xcode.app" ]; then

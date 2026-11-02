@@ -15,6 +15,8 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   longer logs the stacks of all its goroutines when the process gets `SIGUSR2`.
 - HevSocks5Tunnel is built without hev-task-system's stack-overflow detector, whose process-wide `SIGSEGV` and
   `SIGBUS` handlers ran in front of the Go engines' own and faulted on any thread but hev's.
+- The Go engines (LibXray, LibHysteria, WireGuardKitGo) are built with Go 1.27.3 instead of 1.27.1, for its
+  standard library's security fixes and two compiler fixes.
 
 ## 0.4.0 (2026-10-28)
 

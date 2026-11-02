@@ -2,7 +2,7 @@ module github.com/norselabs/libhysteria
 
 go 1.26.0
 
-toolchain go1.27.1
+toolchain go1.27.3
 
 // Hysteria is pinned to release app/v2.12.2 (commit 619a6f8; the core/extras modules carry the
 // matching v2.12.2 tags). extras/go.mod uses "replace ../core", which Go ignores in dependencies,

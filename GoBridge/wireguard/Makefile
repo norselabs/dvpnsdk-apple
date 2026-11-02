@@ -23,7 +23,7 @@ export PATH := $(PATH):/usr/local/bin:/opt/homebrew/bin
 export CC ?= clang
 # amneziawg-go v3 needs Go >= 1.26; pin the toolchain (Go downloads it on first use) so the
 # machine's default Go is left alone.
-export GOTOOLCHAIN ?= go1.27.1
+export GOTOOLCHAIN ?= go1.27.3
 LIPO ?= lipo
 DESTDIR ?= $(CONFIGURATION_BUILD_DIR)
 BUILDDIR ?= $(CONFIGURATION_TEMP_DIR)/wireguard-go-bridge
