@@ -26,6 +26,9 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   Shadowsocks 2022, which is now Xray-core's own code instead of the GPL `sing-shadowsocks`.
 - LibHysteria is built from Hysteria 2.13.0 instead of 2.12.2: its client is unchanged, and its QUIC library moves to
   quic-go 0.63.
+- Through the Xray and Hysteria tunnels, a TCP connection that carries nothing either way is reset after 5 minutes
+  instead of 1, Xray's own idle limit, so an SSH session without keepalives, a websocket that pings less than once a
+  minute or a long poll survives a quiet minute. A UDP association still ends after a quiet minute.
 
 ### Fixed
 

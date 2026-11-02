@@ -114,6 +114,8 @@ open class ProxyPacketTunnelProvider: NEPacketTunnelProvider {
 
 extension ProxyPacketTunnelProvider {
     func startSocks5Tunnel(proxy: LocalProxy) throws {
+        // hev resets a TCP connection that carries nothing either way for 5 minutes, Xray's own idle limit, so a quiet
+        // session (SSH without keepalives, a long poll) outlasts a minute; a UDP association ends after a quiet minute.
         let config = """
         tunnel:
           mtu: \(mtu)
@@ -126,7 +128,8 @@ extension ProxyPacketTunnelProvider {
         misc:
           task-stack-size: 20480
           connect-timeout: 5000
-          read-write-timeout: 60000
+          tcp-read-write-timeout: 300000
+          udp-read-write-timeout: 60000
           log-file: stderr
           log-level: error
           limit-nofile: 65535
