@@ -19,6 +19,8 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   standard library's security fixes and two compiler fixes.
 - LibXray is built from libXray v26.10.31 with Xray-core 26.10.31 instead of 26.9.9, and no longer leaves out
   Shadowsocks 2022, which is now Xray-core's own code instead of the GPL `sing-shadowsocks`.
+- LibHysteria is built from Hysteria 2.13.0 instead of 2.12.2: its client is unchanged, and its QUIC library moves to
+  quic-go 0.63.
 
 ### Fixed
 
