@@ -47,6 +47,10 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   the WireGuard tunnel's before, ran the proxy engine again: the profile kept pointing at its extension, so its last
   node ran, the start reported success, and a proxy tunnel still up was not stopped. The start now points the profile
   back at the WireGuard extension and stops the running tunnel first.
+- In an app that declares no WireGuard extension, `TunnelManager` no longer stops the app when it first loads its
+  tunnels, as `isActive()` does at launch. WireGuard and AmneziaWG credentials fail at `start(from:)` with
+  `TunnelsServiceError.unsupportedProtocol`, like those of any engine the app does not declare, and
+  `NETunnelProviderProtocol(tunnelConfiguration:)` returns nil there.
 
 ## 0.4.0 (2026-10-28)
 

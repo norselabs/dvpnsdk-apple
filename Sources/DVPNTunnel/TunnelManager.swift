@@ -126,6 +126,7 @@ extension TunnelManager {
 
 extension TunnelManager {
     func startWireguard(from credentials: ConnectionCredentials) async throws(TunnelsServiceError) {
+        let descriptor = try requiredDescriptor(for: .wireGuard)
         let service = try await loadService()
 
         if tunnelModel.peersModel.isEmpty { throw .emptyCredentials }
@@ -148,6 +149,7 @@ extension TunnelManager {
             throw .emptyCredentials
         }
 
+        tunnelModel.interfaceModel[.name] = descriptor.tunnelName
         Self.configureBackendNode(tunnelModel, privateKey: privateKey, endpoint: wg, dns: storage.selectedDNS.address)
 
         let tunnelConfiguration: TunnelConfiguration
@@ -316,7 +318,6 @@ extension TunnelManager {
     }
 
     func prepareTunnelModel() {
-        tunnelModel.interfaceModel[.name] = configuration.requiredDescriptor(for: .wireGuard).tunnelName
         if tunnelModel.peersModel.isEmpty {
             tunnelModel.appendEmptyPeer()
         }

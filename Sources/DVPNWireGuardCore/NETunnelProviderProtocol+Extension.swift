@@ -17,13 +17,17 @@ public enum PacketTunnelProviderError: String, Error, Sendable {
 }
 
 public extension NETunnelProviderProtocol {
+    /// nil for a configuration without a name, in an app that declares no WireGuard extension, or when the configuration
+    /// cannot be stored.
     convenience init?(
         tunnelConfiguration: TunnelConfiguration,
         previouslyFrom old: NEVPNProtocol? = nil
     ) {
         self.init()
-        guard let name = tunnelConfiguration.name else { return nil }
-        providerBundleIdentifier = TunnelEnvironment.requiredConfiguration.requiredDescriptor(for: .wireGuard).providerBundleID
+        guard let name = tunnelConfiguration.name,
+              let descriptor = TunnelEnvironment.requiredConfiguration.descriptor(for: .wireGuard)
+        else { return nil }
+        providerBundleIdentifier = descriptor.providerBundleID
 
         // Use file-based storage (no keychain)
         do {
