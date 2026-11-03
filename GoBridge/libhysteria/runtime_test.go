@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/apernet/hysteria/core/v2/client"
-	"github.com/norselabs/libhysteria/internal/socks5"
 )
 
 // A failed proxied connection names the destination the user visits, which no output may hold (README › Logs).
@@ -20,7 +19,7 @@ func TestFailedConnectionsWriteNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer listener.Close()
-	server := &socks5.Server{HyClient: failingClient{}, EventLogger: silentLogger{}}
+	server := newSOCKS5Server(failingClient{}, SOCKS5Config{UDP: true})
 	go func() { _ = server.Serve(listener) }()
 
 	written := stderrOf(t, func() {

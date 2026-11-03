@@ -60,12 +60,7 @@ func Start(configJSON string) error {
 		return fmt.Errorf("socks5 listen on %s: %w", cfg.SOCKS5.Listen, err)
 	}
 
-	server := &socks5.Server{
-		HyClient:    hyClient,
-		AuthFunc:    cfg.SOCKS5.authFunc(),
-		DisableUDP:  !cfg.SOCKS5.UDP,
-		EventLogger: silentLogger{},
-	}
+	server := newSOCKS5Server(hyClient, cfg.SOCKS5)
 	inst := &instance{client: hyClient, listener: listener, done: make(chan struct{})}
 	go func() {
 		defer close(inst.done)
@@ -108,6 +103,16 @@ func IsRunning() bool {
 // Version returns the libhysteria build version.
 func Version() string {
 	return version
+}
+
+// newSOCKS5Server builds the SOCKS5 server Start runs, which the tests build too.
+func newSOCKS5Server(hyClient client.Client, c SOCKS5Config) *socks5.Server {
+	return &socks5.Server{
+		HyClient:    hyClient,
+		AuthFunc:    c.authFunc(),
+		DisableUDP:  !c.UDP,
+		EventLogger: silentLogger{},
+	}
 }
 
 // silentLogger drops the SOCKS5 server's connection events: they name the destinations the user visits, and their
