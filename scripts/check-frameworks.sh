@@ -1,9 +1,9 @@
 #!/bin/sh
 # Checks the engines in Frameworks/ before they are used or released: each has the five slices, each slice holds
 # the engine it is named after, and none links code this package keeps out of them — GPL or LGPL libraries, and in
-# LibXray what GoBridge/xray-core removes; WireGuardKitGo runs on the patched Go runtime. The build scripts run it
-# after a build, and scripts/check.sh and scripts/make-release-assets.sh before using what is there, so an engine
-# built from the unpatched sources is caught.
+# LibXray what GoBridge/xray-core removes; WireGuardKitGo runs on the patched Go runtime, and HevSocks5Tunnel never
+# starts hev-task-system's stack-overflow detector. The build scripts run it after a build, and scripts/check.sh and
+# scripts/make-release-assets.sh before using what is there, so an engine built from the unpatched sources is caught.
 #
 #   scripts/check-frameworks.sh [LibXray|LibHysteria|HevSocks5Tunnel|WireGuardKitGo]...   (default: all four)
 set -eu
@@ -39,6 +39,12 @@ refuse() {
     done || die "rebuild it with its script in scripts/"
 }
 
+# starts_stack_detector <binary>: whether an object of any architecture calls hev-task-system's stack-overflow
+# detector. Its own object defines it either way: build-hev.sh's TPFLAGS only keep hev_task_system_init from calling it.
+starts_stack_detector() {
+    xcrun nm -arch all -u "$1" 2>/dev/null | grep -q '_hev_task_stack_detector_new$'
+}
+
 # verify <engine> <string only that engine holds> <its build script>
 verify() {
     engine=$1 signature=$2 script=$3
@@ -68,6 +74,8 @@ verify() {
         # GoBridge/wireguard's runtime patch makes Go's clock count the time the device slept.
         [ "$engine" != WireGuardKitGo ] || contains "$binary" _mach_continuous_time ||
             die "$framework/$slice runs on a Go runtime without GoBridge/wireguard's patch: run scripts/$script"
+        [ "$engine" != HevSocks5Tunnel ] || ! starts_stack_detector "$binary" ||
+            die "$framework/$slice starts hev-task-system's stack-overflow detector: run scripts/$script"
     done
     echo "$framework: $(echo "$EXPECTED_SLICES" | wc -w | tr -d ' ') slices, nothing it must not link"
 }

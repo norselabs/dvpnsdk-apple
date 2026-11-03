@@ -16,10 +16,12 @@
 # alignment; every consumer then logs "reducing alignment of section __DATA,__common from 0x8000
 # to 0x4000" when linking. Regular zero-filled globals keep the compiler's alignment instead.
 #
-# hev-task-system is built without its stack-overflow detector (TPFLAGS, which replaces the value
+# hev-task-system is built with its stack-overflow detector off (TPFLAGS, which replaces the value
 # hev-socks5-tunnel's Makefile passes it; the slice allocator stays off, as there). The detector
-# installs process-wide SIGSEGV and SIGBUS handlers when the tunnel starts, in front of the Go
-# engines' own, and its handler faults on any thread but hev's before it passes the signal on.
+# would install process-wide SIGSEGV and SIGBUS handlers when the tunnel starts, in front of the Go
+# engines' own, and its handler faults on any thread but hev's before it passes the signal on. The
+# flag removes only its start: its file still compiles, and scripts/check-frameworks.sh checks that
+# no object calls it.
 set -euo pipefail
 
 HEV_TAG="2.19.3"
