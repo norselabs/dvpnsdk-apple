@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import Network
 
 // MARK: - Credentials
 
@@ -105,6 +106,15 @@ extension ConnectionCredentials: Decodable {
                 debugDescription: "connection_handshake.response.addrs is empty"
             )
         }
+        // The host reaches log lines and the WireGuard file as it is, so nothing else gets through; the error does not
+        // repeat it.
+        guard Self.isNodeHost(host) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .addrs,
+                in: response,
+                debugDescription: "connection_handshake.response.addrs[0] is not an IP address or a host name"
+            )
+        }
 
         let dataString = try response.decode(String.self, forKey: .data)
         guard let dataBytes = Data(base64Encoded: dataString) else {
@@ -163,6 +173,17 @@ extension ConnectionCredentials: Decodable {
                     tlsPin: metadata.tlsPin.nonEmpty
                 )
             )
+        }
+    }
+
+    /// An IPv4 or IPv6 address, or a host name: letters, digits and hyphens in dot-separated labels, none starting or
+    /// ending with a hyphen, at most 253 characters.
+    static func isNodeHost(_ host: String) -> Bool {
+        if IPv4Address(host) != nil || IPv6Address(host) != nil { return true }
+        guard !host.isEmpty, host.count <= 253 else { return false }
+        return host.split(separator: ".", omittingEmptySubsequences: false).allSatisfy { label in
+            !label.isEmpty && label.first != "-" && label.last != "-"
+                && label.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }
         }
     }
 

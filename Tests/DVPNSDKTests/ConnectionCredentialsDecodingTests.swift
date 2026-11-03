@@ -240,4 +240,32 @@ struct ConnectionCredentialsDecodingTests {
                 ))
         )
     }
+
+    // MARK: - The node's host
+
+    /// An IPv4 or IPv6 address, or a host name such as a V2Ray node's, is the endpoint's host as sent.
+    @Test(arguments: ["203.0.113.10", "2001:db8::1", "eu-at-1.suchnode.net"])
+    func aNodesAddressOrNameIsItsHost(host: String) throws {
+        let data = try credentialsJSON(protocol: "WIREGUARD", handshake: wireGuardHandshake, addrs: [host])
+        let credentials = try JSONDecoder().decode(ConnectionCredentials.self, from: data)
+        guard case let .wireGuard(endpoint) = credentials.endpoint else {
+            Issue.record("not a WireGuard endpoint")
+            return
+        }
+        #expect(endpoint.host == host)
+    }
+
+    /// Anything else, which log lines and the WireGuard file would take as it is, fails the decoding.
+    @Test(arguments: [
+        "node.example.com\nStarting the tunnel", "node example.com", "node/example.com", "node\"example.com", "",
+        "-node.example.com", Array(repeating: String(repeating: "a", count: 50), count: 5).joined(separator: "."),
+    ])
+    func anyOtherHostFailsTheDecoding(host: String) throws {
+        let data = try credentialsJSON(protocol: "V2RAY", handshake: ["metadata": []], addrs: [host])
+        #expect {
+            try JSONDecoder().decode(ConnectionCredentials.self, from: data)
+        } throws: { error in
+            "\(error)".contains("is not an IP address or a host name")
+        }
+    }
 }
