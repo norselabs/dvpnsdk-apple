@@ -7,8 +7,10 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ### Added
 
-- A start's log lines name the node's network address (`sentnode…`), or "no node address" when the credentials carry
-  none: `TunnelManager.start(from:)`'s, with the node type and host, and each packet tunnel provider's, with the host.
+- A start's log lines name the node's network address (`sentnode…`): `TunnelManager.start(from:)`'s, with the node
+  type and host, and each packet tunnel provider's, with the host. Both say "no node address" when the credentials
+  carry none; the provider's also does when no `start(from:)` has stored one yet, as for a tunnel saved by an earlier
+  version.
 
 ### Changed
 
