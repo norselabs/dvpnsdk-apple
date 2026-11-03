@@ -48,6 +48,8 @@ final class FakeTunnelProfile: TunnelProfile {
     var onStatusChange: ((FakeTunnelProfile) -> Void)?
 
     private(set) var saves = 0
+    /// The extension each accepted save left the profile on, in order: what the system keeps.
+    private(set) var savedProviderBundleIDs: [String?] = []
     private(set) var loads = 0
     private(set) var removals = 0
     private(set) var starts = 0
@@ -70,6 +72,7 @@ final class FakeTunnelProfile: TunnelProfile {
     func saveToPreferences() async throws {
         saves += 1
         if let saveError { throw saveError }
+        savedProviderBundleIDs.append(provider?.providerBundleIdentifier)
     }
 
     func loadFromPreferences() async throws {

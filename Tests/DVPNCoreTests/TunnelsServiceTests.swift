@@ -93,6 +93,7 @@ struct TunnelsServiceTests {
 
             let profile = try #require(store.made.first)
             #expect(profile.provider?.providerBundleIdentifier == "com.example.vpn.wireguard-ne")
+            #expect(profile.savedProviderBundleIDs.last == "com.example.vpn.wireguard-ne")
             #expect(profile.localizedDescription == "WireGuard")
             #expect(profile.stops == 1)
             #expect(tunnel.status == .disconnected)
