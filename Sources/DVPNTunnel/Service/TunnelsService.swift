@@ -205,8 +205,8 @@ extension TunnelsService {
     }
 
     /// Saves a new configuration, on the WireGuard extension. If the tunnel is live and the configuration or the extension
-    /// changed, the tunnel is stopped so the changes take effect; the method returns once it is `.disconnected` and the
-    /// caller is expected to `startActivation(of:)` again.
+    /// changed, the tunnel is stopped so the changes take effect; the method returns once it is `.disconnected`, or after
+    /// `deactivationTimeout`, and the caller is expected to `startActivation(of:)` again.
     func modify(
         tunnel: TunnelContainer,
         isOnDemandEnabled: Bool,
