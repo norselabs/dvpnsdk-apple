@@ -247,6 +247,48 @@ struct TunnelManagerActivationTests {
         }
     }
 
+    /// The proxy starts store it at the same point: a V2Ray start without a UUID, and a Hysteria start in an app that
+    /// declares no Hysteria extension, fail at their checks and leave it; a V2Ray start past them replaces it.
+    @Test
+    func aProxyStartStoresItsNodesAddressOncePastItsChecks() async throws {
+        struct Refused: Error {}
+        try await withConfigurationFilesOfItsOwn {
+            let profile = FakeTunnelProfile(name: "Xray", providerBundleID: "com.example.vpn.v2ray-ne")
+            // A start past its checks then fails at the save.
+            profile.saveError = Refused()
+            let (manager, _) = makeManager([profile])
+            let node = ConnectionEndpoint.v2ray(V2RayNodeEndpoint(
+                host: "203.0.113.20", inbounds: [V2RayInbound(port: 8443, proxyProtocol: .vmess, transport: .grpc)]
+            ))
+            let server = Server(
+                id: "srv-2", countryID: "DE", cityID: "c-1", name: "Berlin 2", isAvailable: true, serverProtocol: "V2RAY",
+                address: "sentnode1qx7example"
+            )
+            let uid = "11111111-2222-3333-4444-555555555555"
+            NodeAddressStore.record("sentnode1qx7previous")
+            defer { NodeAddressStore.record(nil) }
+
+            await #expect(throws: TunnelsServiceError.emptyCredentials) {
+                try await manager.start(from: ConnectionCredentials(nodeType: .v2ray, endpoint: node, server: server))
+            }
+            #expect(NodeAddressStore.load() == "sentnode1qx7previous")
+
+            await #expect(throws: TunnelsServiceError.unsupportedProtocol) {
+                try await manager.start(from: ConnectionCredentials(
+                    nodeType: .hysteria, endpoint: .hysteria(HysteriaEndpoint(host: "203.0.113.30", port: 443)), uid: uid,
+                    server: server
+                ))
+            }
+            #expect(NodeAddressStore.load() == "sentnode1qx7previous")
+
+            await #expect(throws: TunnelsServiceError.self) {
+                try await manager.start(from: ConnectionCredentials(nodeType: .v2ray, endpoint: node, uid: uid, server: server))
+            }
+            #expect(NodeAddressStore.load() == "sentnode1qx7example")
+            #expect(profile.saves == 1, "past its checks, it reached the profile's save")
+        }
+    }
+
     /// Runs `body` with the configuration files in a directory of their own, removed afterwards: a test process cannot
     /// write the App Group container.
     private func withConfigurationFilesOfItsOwn(_ body: () async throws -> Void) async throws {
