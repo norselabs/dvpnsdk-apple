@@ -221,9 +221,9 @@ so the result is the same as with the SDK's own client.
   IPv6 one, so while they run the system routes no IPv6 traffic and apps fall back to IPv4. A provider subclass whose
   `makeNetworkSettings(network:)` claims `::/0` gets IPv6 connections that open on the device, then close at every
   node without IPv6.
-- **No GPL code in the engines.** LibXray is built on Xray-core without its YAML and TOML config loaders, and on
-  REALITY without its fallback rate limiter (`GoBridge/`); `GoBridge/nogpl` checks the licence of every linked Go
-  module, and each build writes a licence inventory for your app's acknowledgements.
+- **No GPL code in the engines.** LibXray is built on REALITY without its fallback rate limiter, whose dependency,
+  `juju/ratelimit`, is LGPL-3.0 (`GoBridge/`); `GoBridge/nogpl` checks the licence of every linked Go module, and each
+  build writes a licence inventory for your app's acknowledgements.
 - **On tvOS** the configuration files live under the App Group's `Library/Caches`, the only place the sandbox allows;
   the app writes them again at every connect.
 

@@ -6,7 +6,7 @@
 #   only, and the loaders link two YAML libraries and go-toml.
 # - Xray-core's TimeoutWrapperReader returning buf.ErrReadTimeout when its wait runs out, as the pipe
 #   reader does (timeout-reader-error.patch): its empty read with no error made the VMess outbound
-#   end the request of an app that sends nothing in its first 0.3 s.
+#   end the request of an app that sends nothing for about 0.3 s plus the time to reach the node.
 # - REALITY without its fallback rate limiter: it is built on github.com/juju/ratelimit (LGPL-3.0),
 #   and only a REALITY server uses it.
 #
