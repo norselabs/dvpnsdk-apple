@@ -55,8 +55,8 @@ step "Go"
 for module in nogpl libhysteria; do
   { go -C "GoBridge/$module" vet ./... && go -C "GoBridge/$module" test ./...; } > "$LOGS/$module.log" 2>&1 || { cat "$LOGS/$module.log" >&2; fail "GoBridge/$module vet or tests failed"; }
 done
-scripts/check-frameworks.sh > "$LOGS/frameworks.log" 2>&1 || { cat "$LOGS/frameworks.log" >&2; fail "a binary framework is missing, incomplete or links GPL or LGPL code"; }
-pass "gofmt, the GoBridge/nogpl and GoBridge/libhysteria tests, the binary frameworks complete and without GPL or LGPL code"
+scripts/check-frameworks.sh > "$LOGS/frameworks.log" 2>&1 || { cat "$LOGS/frameworks.log" >&2; fail "scripts/check-frameworks.sh refused an engine in Frameworks/ (its reason is above)"; }
+pass "gofmt, the GoBridge/nogpl and GoBridge/libhysteria tests, and scripts/check-frameworks.sh on the engines in Frameworks/"
 
 step "Build and test"
 scripts/test.sh > "$LOGS/test.log" 2>&1 || { grep -E 'error:|failed' "$LOGS/test.log" | sort -u | head -20 >&2; fail "tests failed, see .build/check/test.log"; }
