@@ -165,7 +165,7 @@ private extension MirroredTransport {
             request: request,
             silence: configuration.mirrorRequestTimeout,
             primaryFailure: primaryFailure,
-            primaryHasStarted: { progress.hasStarted }
+            primaryStart: { progress.start }
         )
         let silenceEnds = clock.sleep(endingIn: .seconds(attempts.silence))
         let resolver = resolver

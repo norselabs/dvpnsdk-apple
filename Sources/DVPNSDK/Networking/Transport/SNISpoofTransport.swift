@@ -241,7 +241,7 @@ private extension SNISpoofTransport {
         queue.asyncAfter(deadline: .now() + timeout) { connection.cancel() }
 
         // A body leaves with the request's one write; a GET starts with its answer, as URLSession counts them.
-        if request.httpBody?.isEmpty == false { progress?.markStarted() }
+        if request.httpBody?.isEmpty == false { progress?.markStarted(.body) }
         try await sendAll(connection, data: encode(request: request, url: url, sni: sni))
         return try await receiveAll(connection)
     }
@@ -294,7 +294,7 @@ private extension SNISpoofTransport {
             }
             if let data = chunk.0, !data.isEmpty {
                 buffer.append(data)
-                progress?.markStarted()
+                progress?.markStarted(.answer)
             }
             if chunk.1 { break }
         }

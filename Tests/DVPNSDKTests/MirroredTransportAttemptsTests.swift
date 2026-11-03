@@ -17,9 +17,9 @@ struct MirroredTransportAttemptsTests {
         var path: String { "server" }
     }
 
-    /// Whether the primary has started, as the test says.
+    /// How far the primary has got, as the test says.
     private final class Start {
-        var hasHappened = false
+        var value: RequestProgress.Start?
     }
 
     private static let body = RequestPayload.json(["name": "value"])
@@ -32,7 +32,7 @@ struct MirroredTransportAttemptsTests {
             request: APIRequest(target: target, timeoutInterval: limit),
             silence: 5,
             primaryFailure: PrimaryFailure(),
-            primaryHasStarted: { start.hasHappened }
+            primaryStart: { start.value }
         )
     }
 
@@ -94,23 +94,24 @@ struct MirroredTransportAttemptsTests {
         _ = try attempts.step(after: .silent)
         _ = try attempts.step(after: .mirrorReady(Self.mirror))
 
-        start.hasHappened = true
+        start.value = .body
 
         #expect(throws: APIError.unreachable(.timedOut)) { try attempts.step(after: .primary(.failure(CancellationError()))) }
     }
 
-    /// A primary that started keeps the request, whether it started before its time was over or during the lookup.
-    @Test(arguments: [Target(), Target(method: .post, payload: body)])
-    func aPrimaryThatStartedKeepsTheRequest(target: Target) throws {
+    /// A primary that started keeps the request, whether it started before its time was over or during the lookup, and
+    /// whether it took the body or began its answer.
+    @Test(arguments: [Target(), Target(method: .post, payload: body)], [RequestProgress.Start.body, .answer])
+    func aPrimaryThatStartedKeepsTheRequest(target: Target, started: RequestProgress.Start) throws {
         let start = Start()
-        start.hasHappened = true
+        start.value = started
         var startedEarly = attempts(target, start: start)
         #expect(try startedEarly.step(after: .silent) == .wait)
 
         let lateStart = Start()
         var startedLate = attempts(target, start: lateStart)
         _ = try startedLate.step(after: .silent)
-        lateStart.hasHappened = true
+        lateStart.value = started
         #expect(try startedLate.step(after: .mirrorReady(Self.mirror)) == .wait)
     }
 
@@ -245,18 +246,18 @@ extension MirroredTransportAttemptsTests {
         _ = try attempts.step(after: .mirrorReady(Self.mirror))
         _ = try attempts.step(after: .silent)
 
-        attempts.mirrorProgress.markStarted()
+        attempts.mirrorProgress.markStarted(.body)
 
         #expect(throws: APIError.unreachable(.timedOut)) { try attempts.step(after: .mirror(.failure(end))) }
     }
 
-    /// A mirror that started keeps the request.
-    @Test(arguments: [Target(), Target(method: .post, payload: body)])
-    func aMirrorThatStartedKeepsTheRequest(target: Target) throws {
+    /// A mirror that started keeps the request, whether it took the body or began its answer.
+    @Test(arguments: [Target(), Target(method: .post, payload: body)], [RequestProgress.Start.body, .answer])
+    func aMirrorThatStartedKeepsTheRequest(target: Target, started: RequestProgress.Start) throws {
         var attempts = mirrorFirst(target)
         _ = try attempts.step(after: .mirrorReady(Self.mirror))
 
-        attempts.mirrorProgress.markStarted()
+        attempts.mirrorProgress.markStarted(started)
 
         #expect(try attempts.step(after: .silent) == .wait)
     }
@@ -299,7 +300,7 @@ extension MirroredTransportAttemptsTests {
         _ = try attempts.step(after: .silent)
         _ = try attempts.step(after: .mirrorReady(Self.mirror))
 
-        attempts.primaryProgress.markStarted()
+        attempts.primaryProgress.markStarted(.body)
 
         #expect(throws: HardFailure.self) { try attempts.step(after: .primary(.failure(refused))) }
     }
@@ -317,7 +318,7 @@ extension MirroredTransportAttemptsTests {
 
         var racing = mirrorFirst()
         _ = try racing.step(after: .mirrorReady(Self.mirror))
-        racing.mirrorProgress.markStarted()
+        racing.mirrorProgress.markStarted(.answer)
         _ = try racing.step(after: .mirror(.failure(refused)))
         #expect(try racing.step(after: .silent) == .askPrimary)
         _ = try racing.step(after: .mirrorReady(another))

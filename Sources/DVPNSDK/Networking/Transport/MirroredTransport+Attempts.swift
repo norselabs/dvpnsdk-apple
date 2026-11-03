@@ -40,8 +40,8 @@ extension MirroredTransport {
         let request: APIRequest
         let silence: TimeInterval
         let primaryFailure: PrimaryFailure
-        /// Whether the primary has started on the request (`RequestProgress.hasStarted`).
-        let primaryHasStarted: () -> Bool
+        /// How far the primary has got on the request, if it started (`RequestProgress.start`).
+        let primaryStart: () -> RequestProgress.Start?
         var primaryHardFailure: HardFailure?
         /// A mirror is being looked up for a silent primary.
         var isLookingForMirror = false
@@ -97,8 +97,8 @@ extension MirroredTransport {
             let path = path
             let silence = silence
             guard !isMirrorAsked else { return .wait }
-            guard !primaryHasStarted() else {
-                log.notice("send [\(path, privacy: .public)] primary started — waiting for its answer")
+            if let start = primaryStart() {
+                log.notice("send [\(path, privacy: .public)] primary started (\(start.logged, privacy: .public)) — waiting for its answer")
                 return .wait
             }
             log.notice("send [\(path, privacy: .public)] primary silent for \(silence) s — looking for a mirror")
@@ -123,8 +123,8 @@ extension MirroredTransport {
                 log.notice("send [\(path, privacy: .public)] no mirror to take over — waiting for the primary")
                 return .wait
             }
-            guard !primaryHasStarted() else {
-                log.notice("send [\(path, privacy: .public)] primary started — waiting for its answer")
+            if let start = primaryStart() {
+                log.notice("send [\(path, privacy: .public)] primary started (\(start.logged, privacy: .public)) — waiting for its answer")
                 return .wait
             }
             if request.target.method == .get {
@@ -157,7 +157,7 @@ extension MirroredTransport {
         private func hardFailure(of error: any Error) throws -> HardFailure {
             let path = path
             if isHandingOver, error is CancellationError {
-                guard !primaryHasStarted() else {
+                guard primaryStart() == nil else {
                     log.error("send [\(path, privacy: .public)] primary took the request as it was handed over — giving up")
                     throw APIError.unreachable(.timedOut)
                 }
@@ -286,8 +286,8 @@ extension MirroredTransport {
             let path = path
             let silence = silence
             guard !isPrimaryAsked else { return .wait }
-            switch mirror {
-            case .lookingUp:
+            switch (mirror, mirrorProgress.start) {
+            case (.lookingUp, _):
                 isPrimaryAsked = true
                 if request.target.method == .get {
                     log.notice("send [\(path, privacy: .public)] no mirror after \(silence) s — asking the primary too")
@@ -296,18 +296,18 @@ extension MirroredTransport {
                     isHandedOver = true
                 }
                 return .askPrimary
-            case .sending where mirrorProgress.hasStarted:
-                log.notice("send [\(path, privacy: .public)] mirror started — waiting for its answer")
+            case let (.sending, start?):
+                log.notice("send [\(path, privacy: .public)] mirror started (\(start.logged, privacy: .public)) — waiting for its answer")
                 return .wait
-            case .sending where request.target.method == .get:
+            case (.sending, nil) where request.target.method == .get:
                 log.notice("send [\(path, privacy: .public)] mirror silent for \(silence) s — asking the primary too")
                 isPrimaryAsked = true
                 return .askPrimary
-            case .sending:
+            case (.sending, nil):
                 log.notice("send [\(path, privacy: .public)] mirror silent for \(silence) s — stopping it for the primary")
                 isStoppingMirror = true
                 return .stopMirror
-            case .found, .done:
+            case (.found, _), (.done, _):
                 return .wait
             }
         }
@@ -372,6 +372,16 @@ extension MirroredTransport {
             case .done:
                 throw error
             }
+        }
+    }
+}
+
+private extension RequestProgress.Start {
+    /// The start as a waiting request's line names it.
+    var logged: String {
+        switch self {
+        case .body: "body sent, no answer yet"
+        case .answer: "answer begun"
         }
     }
 }

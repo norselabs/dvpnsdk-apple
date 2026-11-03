@@ -12,12 +12,12 @@ import Testing
 /// only over one, and its stop.
 @Suite(.timeLimit(.minutes(1)))
 struct RequestProgressTests {
-    /// A server that took the request's body, or began its answer, has started on the request.
+    /// A server that took the request's body, or began its answer, has started on the request, and the start says which.
     @Test(arguments: [
-        ("POST", Data(#"{"name":"value"}"#.utf8), ""),
-        ("GET", nil, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{"),
+        ("POST", Data(#"{"name":"value"}"#.utf8) as Data?, "", RequestProgress.Start.body),
+        ("GET", nil as Data?, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{", RequestProgress.Start.answer),
     ])
-    func aBodyTakenOrAnAnswerBegunIsAStart(method: String, body: Data?, answerStart: String) async throws {
+    func aBodyTakenOrAnAnswerBegunIsAStart(method: String, body: Data?, answerStart: String, expected: RequestProgress.Start) async throws {
         let server = try LoopbackServer(answerStart: answerStart)
         let progress = RequestProgress()
         let task = try await send(method: method, body: body, to: server.start(), watchedBy: progress)
@@ -26,7 +26,8 @@ struct RequestProgressTests {
             server.stop()
         }
 
-        try await eventually { progress.hasStarted }
+        try await eventually { progress.start == expected }
+        #expect(progress.hasStarted)
     }
 
     /// A server that has a request without a body and says nothing has not started on it, as far as the client can see.
@@ -59,13 +60,16 @@ struct RequestProgressTests {
         #expect(stopped.withLock { $0 } == 2)
     }
 
-    /// A start the send marks itself, as an SNI mirror's does, counts.
+    /// A start the send marks itself, as an SNI mirror's does, counts, and an answer begun stays one.
     @Test
     func aMarkedStartCounts() {
         let progress = RequestProgress()
         #expect(!progress.hasStarted)
-        progress.markStarted()
-        #expect(progress.hasStarted)
+        progress.markStarted(.body)
+        #expect(progress.start == .body)
+        progress.markStarted(.answer)
+        progress.markStarted(.body)
+        #expect(progress.start == .answer)
     }
 
     /// A send stopped before it began is sent nothing: it ends at once, and the server never sees it.
