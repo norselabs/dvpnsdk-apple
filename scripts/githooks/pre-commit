@@ -13,6 +13,12 @@ done < <(git diff --cached --name-only --diff-filter=ACMR -z -- '*.swift')
 for tool in swiftformat swiftlint; do
   command -v "$tool" >/dev/null || { echo "pre-commit: $tool is missing, run scripts/bootstrap.sh" >&2; exit 1; }
 done
+# Another version than scripts/check.sh pins lints by other rules; the check stops on it anyway.
+if [[ $(swiftformat --version) != "$(sed -n 's/^SWIFTFORMAT_VERSION=//p' scripts/check.sh)" ||
+  $(swiftlint version) != "$(sed -n 's/^SWIFTLINT_VERSION=//p' scripts/check.sh)" ]]; then
+  echo "pre-commit: SwiftFormat or SwiftLint is not the version scripts/check.sh pins: lint skipped" >&2
+  exit 0
+fi
 
 swiftformat --lint --quiet "${files[@]}" || { echo "pre-commit: run \`swiftformat ${files[*]}\`" >&2; exit 1; }
 swiftlint lint --strict --quiet --force-exclude "${files[@]}"

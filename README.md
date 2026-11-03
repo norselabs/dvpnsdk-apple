@@ -273,7 +273,9 @@ zips the four frameworks and writes their checksums and `binaryRelease` into `Pa
 
 ## Working on it
 
-- `scripts/bootstrap.sh` enables the pre-commit hook (SwiftFormat and SwiftLint on staged files).
+- `scripts/bootstrap.sh` enables the pre-commit hook (SwiftFormat and SwiftLint on staged files, skipped when either is
+  not the version `scripts/check.sh` pins) and says when one is not. Homebrew installs only the newest release, so a
+  pinned one comes from the tool's GitHub release.
 - `scripts/check.sh [--fix] [--platforms]` before pushing: formatting and lint with the SwiftFormat and SwiftLint
   versions it pins, the Go checks, the engines' licence check, the tests, and with `--platforms` an `xcodebuild` of every
   target for iOS Simulator, macOS and tvOS Simulator.
