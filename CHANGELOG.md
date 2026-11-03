@@ -55,6 +55,9 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   tunnels, as `isActive()` does at launch. WireGuard and AmneziaWG credentials fail at `start(from:)` with
   `TunnelsServiceError.unsupportedProtocol`, like those of any engine the app does not declare, and
   `NETunnelProviderProtocol(tunnelConfiguration:)` returns nil there.
+- A WireGuard or AmneziaWG node with an IPv6 address no longer fails to start with
+  `TunnelsServiceError.addTunnelFailed`: `TunnelManager` writes its endpoint in brackets, as WireGuard's configuration
+  format needs, and still refuses a host with characters a host name cannot hold.
 
 ## 0.4.0 (2026-10-28)
 

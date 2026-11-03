@@ -8,6 +8,7 @@ import DVPNSDK
 import DVPNWireGuardCore
 import DVPNXRayCore
 import Foundation
+import Network
 import WireGuardKitTypes
 
 // MARK: - Constants
@@ -198,7 +199,10 @@ extension TunnelManager {
 
         let port = String(wg.port)
         model.interfaceModel[.listenPort] = port
-        model.peersModel[0][.endpoint] = "\(wg.host):\(port)"
+        // An IPv6 address goes in brackets, as wg-quick writes it: without them the endpoint's parser, which also checks
+        // the host's characters, takes the host up to its first colon.
+        let host = IPv6Address(wg.host) == nil ? wg.host : "[\(wg.host)]"
+        model.peersModel[0][.endpoint] = "\(host):\(port)"
         model.peersModel[0][.publicKey] = wg.peerPublicKey
         model.peersModel[0][.preSharedKey] = ""
         model.peersModel[0][.allowedIPs] = constants.allowedIPs

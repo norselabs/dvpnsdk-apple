@@ -67,4 +67,42 @@ struct BackendWireGuardNodeTests {
         #expect(!text.contains("PresharedKey"))
         #expect(!text.contains("MTU"))
     }
+
+    /// A node's IPv6 address goes in brackets, as wg-quick writes it; an IPv4 address and a host name stay as they are.
+    @Test(arguments: [
+        ("2001:db8::1", "[2001:db8::1]:51820"),
+        ("203.0.113.10", "203.0.113.10:51820"),
+        ("node.example.com", "node.example.com:51820"),
+    ])
+    func theEndpointIsWrittenAsWgQuickReadsIt(host: String, endpoint: String) throws {
+        let model = try configuredModel(host: host)
+
+        #expect(model.peersModel[0][.endpoint] == endpoint)
+        let configuration = try model.save().get()
+        #expect(configuration.peers[0].endpoint?.stringRepresentation == endpoint)
+        #expect(configuration.asWgQuickConfig().contains("Endpoint = \(endpoint)\n"))
+    }
+
+    /// A host the endpoint's parser refuses, such as one with a line break that would add lines to the file the
+    /// extension reads, still fails the save, an IPv6 address with one included.
+    @Test(arguments: ["node.example.com\n[Peer]", "2001:db8::1\nPublicKey = x", "node example.com"])
+    func aHostTheParserRefusesFailsTheSave(host: String) throws {
+        let model = try configuredModel(host: host)
+
+        guard case let .failure(error) = model.save() else {
+            Issue.record("the configuration was saved")
+            return
+        }
+        #expect(error as? TunnelSavingError == .endpointInvalid)
+    }
+
+    private func configuredModel(host: String) throws -> TunnelModel {
+        let model = try TunnelModel(tunnelConfiguration: TunnelConfiguration(fromWgQuickConfig: imported, called: "WireGuard"))
+        let privateKey = try #require(PrivateKey(base64Key: "oK56DE9Ue9zHAt61A8xBeLjd9zLOUlGmk8hYB7sTf1k="))
+        let node = WireGuardEndpoint(
+            host: host, port: 51820, clientAddress: "10.10.0.2", peerPublicKey: "xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg="
+        )
+        TunnelManager.configureBackendNode(model, privateKey: privateKey, endpoint: node, dns: "1.1.1.1")
+        return model
+    }
 }
