@@ -92,7 +92,7 @@ extension TunnelManager {
     /// Starts the tunnel engine that serves the credentials' node type. Returns once connected (and,
     /// for the WireGuard family, once the first handshake is seen).
     public func start(from credentials: ConnectionCredentials) async throws(TunnelsServiceError) {
-        recordNode(of: credentials)
+        logStart(of: credentials)
         switch credentials.nodeType.tunnelProtocolID {
         case .wireGuard:
             try await startWireguard(from: credentials)
@@ -165,6 +165,7 @@ extension TunnelManager {
             }
         }
 
+        recordAddress(of: credentials)
         let tunnel: TunnelContainer
         if let existing = service.tunnels.last {
             try await service.modify(
@@ -233,7 +234,9 @@ extension TunnelManager {
             throw .emptyCredentials
         }
         model.obfuscation = selectedObfuscation
-        try await startXray(source: .model(model), descriptor: try requiredDescriptor(for: .xray))
+        let descriptor = try requiredDescriptor(for: .xray)
+        recordAddress(of: credentials)
+        try await startXray(source: .model(model), descriptor: descriptor)
     }
 
     /// The app's obfuscation setting, read at connect time so a toggle applies to the next connection.

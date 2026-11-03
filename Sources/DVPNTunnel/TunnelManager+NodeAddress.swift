@@ -9,11 +9,15 @@ import DVPNSDK
 // MARK: - Node address
 
 extension TunnelManager {
-    /// Logs the node a start connects to and stores its address for the extension's start line. Every start replaces
-    /// the address, also one that then fails before its tunnel starts.
-    func recordNode(of credentials: ConnectionCredentials) {
-        NodeAddressStore.record(credentials.server?.address)
+    /// Logs the node a start connects to, before anything can fail.
+    func logStart(of credentials: ConnectionCredentials) {
         logger.notice("\(Self.startLine(for: credentials), privacy: .public)")
+    }
+
+    /// Stores the node's address for the extension's start line once the start is past its checks, just before it saves
+    /// its configuration: a start that fails earlier leaves the address of the configuration a restart runs.
+    func recordAddress(of credentials: ConnectionCredentials) {
+        NodeAddressStore.record(credentials.server?.address)
     }
 
     /// "Starting the tunnel to the WIREGUARD node at 203.0.113.5 (sentnode1…)", or "(no node address)".

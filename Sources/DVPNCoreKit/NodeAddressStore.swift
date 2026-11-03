@@ -7,13 +7,14 @@ import Foundation
 
 // MARK: - NodeAddressStore
 
-/// The network address (`sentnode…`) of the node the last start connects to, for the packet tunnels' start lines:
-/// `TunnelManager.start(from:)` writes it, or its absence, at every start, and a restart or an on-demand start, which get
-/// no new credentials, name the node they start again. App Group defaults.
+/// The network address (`sentnode…`) of the node whose configuration the last start saved, for the packet tunnels' start
+/// lines: `TunnelManager.start(from:)` writes it, or its absence, once a start is past its checks, so a restart or an
+/// on-demand start, which get no new credentials, name the node they start again, unless saving that configuration
+/// failed. App Group defaults.
 package enum NodeAddressStore {
     package static let key = "TUNNEL_NODE_ADDRESS"
 
-    /// Keeps `address`; without one, forgets the previous, so a start never names another node.
+    /// Keeps `address`; without one, forgets the previous, so a start without one does not name the previous node.
     package static func record(_ address: String?, in defaults: UserDefaults = .shared) {
         if let address, !address.isEmpty {
             defaults.set(address, forKey: key)

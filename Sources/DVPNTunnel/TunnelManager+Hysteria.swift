@@ -17,6 +17,7 @@ extension TunnelManager {
         guard case let .hysteria(endpoint) = credentials.endpoint else {
             throw .emptyCredentials
         }
+        recordAddress(of: credentials)
         try await startHysteria(configuration: Self.configuration(for: endpoint, uid: credentials.uid), descriptor: descriptor)
     }
 

@@ -15,8 +15,8 @@ import Testing
 /// is stopped. A stop that follows a failure is announced to the provider first, so the provider writes its log
 /// file (`ExtensionLogFile`); a stop the app asks for otherwise is not.
 ///
-/// Every proxy start clears the shared `ProxyStartErrorStore`, and every start writes the shared `NodeAddressStore` (App
-/// Group defaults), so the suite runs serially.
+/// Every proxy start clears the shared `ProxyStartErrorStore`, and every start past its checks writes the shared
+/// `NodeAddressStore` (App Group defaults), so the suite runs serially.
 @MainActor
 @Suite(.serialized)
 struct TunnelManagerActivationTests {
@@ -207,30 +207,54 @@ struct TunnelManagerActivationTests {
         #expect(profile.starts == 0)
     }
 
-    /// A start stores its node's address for the extension's start line before anything can fail, and one without an
-    /// address forgets the previous, so no line names another node.
+    /// A start stores its node's address for the extension's start line once it is past its checks, and one without an
+    /// address forgets the previous; a start that fails before then leaves the address of the configuration a restart
+    /// runs.
     @Test
     func aStartStoresItsNodesAddress() async throws {
-        let (manager, _) = makeManager([FakeTunnelProfile(name: "WireGuard", providerBundleID: "com.example.vpn.wireguard-ne")])
-        let endpoint = ConnectionEndpoint.wireGuard(WireGuardEndpoint(
-            host: "203.0.113.10", port: 51820, clientAddress: "10.10.0.2", peerPublicKey: "xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg="
-        ))
-        let server = Server(
-            id: "srv-1", countryID: "DE", cityID: "c-1", name: "Berlin 1", isAvailable: true, serverProtocol: "WIREGUARD",
-            address: "sentnode1qx7example"
-        )
-        defer { NodeAddressStore.record(nil) }
+        struct Refused: Error {}
+        try await withConfigurationFilesOfItsOwn {
+            let profile = FakeTunnelProfile(name: "WireGuard", providerBundleID: "com.example.vpn.wireguard-ne")
+            // A start past its checks then fails at the save.
+            profile.saveError = Refused()
+            let (manager, _) = makeManager([profile])
+            let endpoint = ConnectionEndpoint.wireGuard(WireGuardEndpoint(
+                host: "203.0.113.10", port: 51820, clientAddress: "10.10.0.2", peerPublicKey: "xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg="
+            ))
+            let server = Server(
+                id: "srv-1", countryID: "DE", cityID: "c-1", name: "Berlin 1", isAvailable: true, serverProtocol: "WIREGUARD",
+                address: "sentnode1qx7example"
+            )
+            let key = "WAmgVYXkbT2bCtdcDwolI88/iqlDu4tf4B9Bl6qaJ0U="
+            NodeAddressStore.record("sentnode1qx7previous")
+            defer { NodeAddressStore.record(nil) }
 
-        // Without a key, both starts fail at once.
-        await #expect(throws: TunnelsServiceError.emptyCredentials) {
-            try await manager.start(from: ConnectionCredentials(nodeType: .wireguard, endpoint: endpoint, server: server))
-        }
-        #expect(NodeAddressStore.load() == "sentnode1qx7example")
+            // Without a key, the start fails at its checks.
+            await #expect(throws: TunnelsServiceError.emptyCredentials) {
+                try await manager.start(from: ConnectionCredentials(nodeType: .wireguard, endpoint: endpoint, server: server))
+            }
+            #expect(NodeAddressStore.load() == "sentnode1qx7previous")
 
-        await #expect(throws: TunnelsServiceError.emptyCredentials) {
-            try await manager.start(from: ConnectionCredentials(nodeType: .wireguard, endpoint: endpoint))
+            await #expect(throws: TunnelsServiceError.self) {
+                try await manager.start(from: ConnectionCredentials(nodeType: .wireguard, endpoint: endpoint, privateKey: key, server: server))
+            }
+            #expect(NodeAddressStore.load() == "sentnode1qx7example")
+
+            await #expect(throws: TunnelsServiceError.self) {
+                try await manager.start(from: ConnectionCredentials(nodeType: .wireguard, endpoint: endpoint, privateKey: key))
+            }
+            #expect(NodeAddressStore.load() == nil)
         }
-        #expect(NodeAddressStore.load() == nil)
+    }
+
+    /// Runs `body` with the configuration files in a directory of their own, removed afterwards: a test process cannot
+    /// write the App Group container.
+    private func withConfigurationFilesOfItsOwn(_ body: () async throws -> Void) async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(component: UUID().uuidString, directoryHint: .isDirectory)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try await TunnelConfigDirectories.$homeDirectoryOverride.withValue(directory) {
+            try await body()
+        }
     }
 
     /// A manager over a service of fake profiles that report their status changes to it.
