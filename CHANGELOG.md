@@ -5,6 +5,8 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ## Unreleased
 
+## 0.5.1 (2026-11-04)
+
 ### Fixed
 
 - A Hysteria node's certificate pin (`HysteriaEndpoint.tlsPin`) is checked against the certificate whose key signs the

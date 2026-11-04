@@ -6,12 +6,12 @@ import PackageDescription
 
 /// The release whose assets hold the prebuilt engines. `Frameworks/<name>.xcframework`, built by the scripts in
 /// `scripts/`, takes precedence when it exists, so a change to an engine is tested without a release.
-let binaryRelease = "0.5.0"
+let binaryRelease = "0.5.1"
 let binaryChecksums = [
-    "LibXray": "12b18ce4821e3dbac3f0e833cdb285b6ce5e5b6e5e5d0388371f6e7d2ed53f68",
-    "LibHysteria": "fa9f394ab1c1ee82355fb54b746e83960dc5153ead96c14fc9cbd3cef323a328",
-    "HevSocks5Tunnel": "4c87a90c8d87b7de2f1f3480b947512a1ff527a0d47ca4f2c7ec875fd200fbf0",
-    "WireGuardKitGo": "8289066502713a88abf4c7e5316d7759942feec19ff538d7c9fd78db284ac8a0",
+    "LibXray": "9fdb668ae9dfe014929fffb2d1cd31c7ba526461dcec3bd4cfaf6fc9008031b7",
+    "LibHysteria": "09e310fb3f9f4db4bd771a84bc39105a43bb633aad6dab714809954ac61454d7",
+    "HevSocks5Tunnel": "a3131c9f7f41e385469f28215b78e7bbb35a9c93260b866c8522beee4861c98a",
+    "WireGuardKitGo": "15474497a2633000cd52937e483c2b38a0b5a0883b57d0ca0719e06ae787163d",
 ]
 
 func engine(_ name: String) -> Target {
