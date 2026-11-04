@@ -3,7 +3,7 @@
 
 Xcode's ProcessXCFramework step copies a library-style xcframework's headers into the shared
 $(BUILT_PRODUCTS_DIR)/include/ directory, so two such frameworks that both ship a module.modulemap
-(LibXray, LibHysteria, Tun2SocksKit's HevSocks5Tunnel) collide with "Multiple commands produce
+(LibXray, LibHysteria, HevSocks5Tunnel) collide with "Multiple commands produce
 .../include/module.modulemap". Framework-style slices keep their headers and module map inside the
 bundle, which is what gomobile used to produce.
 

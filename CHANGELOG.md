@@ -5,6 +5,8 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ## Unreleased
 
+## 0.5.0 (2026-11-04)
+
 ### Added
 
 - A start's log lines name the node's network address (`sentnode…`): `TunnelManager.start(from:)`'s, with the node
