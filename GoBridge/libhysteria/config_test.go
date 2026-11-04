@@ -1,6 +1,8 @@
 package libhysteria
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"testing"
 )
@@ -119,5 +121,23 @@ func TestSOCKS5CredentialsAreCheckedWhenSet(t *testing.T) {
 	}
 	if open.SOCKS5.authFunc() != nil {
 		t.Error("no credentials set, but authentication required")
+	}
+}
+
+// The pin names the leaf, the certificate whose key signs the handshake. The rest of the chain is the node's to send,
+// so a chain that carries the pinned certificate after another leaf is refused.
+func TestPinChecksTheLeafOnly(t *testing.T) {
+	pinned := []byte("the pinned certificate")
+	other := []byte("another certificate")
+	sum := sha256.Sum256(pinned)
+	verify := pinVerifier(hex.EncodeToString(sum[:]))
+	if err := verify([][]byte{pinned, other}, nil); err != nil {
+		t.Fatalf("the pinned leaf was refused: %v", err)
+	}
+	if err := verify([][]byte{other, pinned}, nil); err == nil {
+		t.Fatal("a chain with the pinned certificate after another leaf passed")
+	}
+	if err := verify(nil, nil); err == nil {
+		t.Fatal("an empty chain passed")
 	}
 }

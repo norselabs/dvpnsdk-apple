@@ -5,6 +5,12 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ## Unreleased
 
+### Fixed
+
+- A Hysteria node's certificate pin (`HysteriaEndpoint.tlsPin`) is checked against the certificate whose key signs the
+  handshake, the first of the chain, instead of against every certificate the node sends: a chain that carried the
+  pinned certificate after another leaf was accepted, so a party on the network path could take the tunnel over.
+
 ## 0.5.0 (2026-11-04)
 
 ### Added

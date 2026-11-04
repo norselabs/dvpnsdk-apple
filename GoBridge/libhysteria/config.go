@@ -240,15 +240,17 @@ func normalizeCertHash(hash string) string {
 	return r
 }
 
+// pinVerifier checks the pin against the leaf only: its key signs the handshake, while the rest of the chain is the
+// node's to send, so a chain that merely carries the pinned certificate proves nothing.
 func pinVerifier(expected string) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 	return func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
-		for _, cert := range rawCerts {
-			sum := sha256.Sum256(cert)
+		if len(rawCerts) > 0 {
+			sum := sha256.Sum256(rawCerts[0])
 			if hex.EncodeToString(sum[:]) == expected {
 				return nil
 			}
 		}
-		return errors.New("no certificate matches the pinned SHA-256 digest")
+		return errors.New("the node's certificate does not match the pinned SHA-256 digest")
 	}
 }
 
