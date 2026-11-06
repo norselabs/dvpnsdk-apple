@@ -204,12 +204,18 @@ The model can also be filled in field by field from the same answer:
 | Hysteria 2 | `.hysteria(HysteriaEndpoint(host:port:auth:sni:obfsPassword:insecure:tlsPin:))` | `uid` when the node sent no `auth` |
 
 Which inbound of an Xray or V2Ray node to dial, TLS trust and the fallbacks are decided by `DVPNTunnel` either way,
-so the result is the same as with the SDK's own client.
+so the result is the same as with the SDK's own client. So are the checks on what a node sends: `start(from:)` refuses
+a node address the decoder would refuse (`TunnelsServiceError.refusedNodeAddress`), and takes only the AmneziaWG keys
+a node sets.
 
 ## How it is built
 
 - **The SDK decodes, the tunnel decides.** `DVPNSDK` decodes a node's handshake as the node sent it; which inbound to
   dial, TLS trust and every fallback are decided in `DVPNTunnel`, next to their tests.
+- **What a node sends is checked before it is used.** The decoder refuses a node address that does not lead to the
+  internet, reads no AmneziaWG key a node does not set, and drops format and control characters from server and city
+  names; the tunnel layer refuses AmneziaWG values that could crash the engine or add settings, an Xray inbound with
+  values Xray-core would refuse, and trusts an unpinned Hysteria node only through the system's roots.
 - **Only `DVPNTunnel` imports `DVPNSDK`.** Everything an extension runs stays free of the backend client (lint enforces
   it).
 - **Mirrors.** When the API cannot be reached, requests go to mirrors: other hosts from the mirror lists, or the API
@@ -252,7 +258,8 @@ the SDK's lines too. A line holds only what may leave the device:
 How the SDK keeps to it: every error goes through one helper (`logDescription`; in `DVPNSDK`, the transport's
 `describeFailure`), and lint stops an error being logged whole. Before Xray's or Hysteria's start error is logged or
 recorded, every credential the provider holds is replaced with "…"; WireGuard's engine lines name only the node.
-Xray's own log is off.
+Xray's own log is off. A provider's log file and its recorded start error keep each entry on one line, line breaks and
+other control characters escaped, so text an engine quotes from a node cannot read as an entry of its own.
 
 ## Building the engines
 
