@@ -20,6 +20,7 @@ open class ProxyPacketTunnelProvider: NEPacketTunnelProvider {
 
     /// Whether the app announced that the coming stop follows a failure (`ExtensionLogFile.failedStopNotice`).
     private let stopFollowsFailure = OSAllocatedUnfairLock(initialState: false)
+    private let socks5TunnelLoop = Socks5TunnelLoop()
 
     override public init() {
         super.init()
@@ -92,6 +93,7 @@ open class ProxyPacketTunnelProvider: NEPacketTunnelProvider {
     }
 
     override open nonisolated(nonsending) func stopTunnel(with reason: NEProviderStopReason) async {
+        socks5TunnelLoop.stop()
         logger.error("tunnel is stopped due to: \(Self.describe(reason), privacy: .public)")
         TunnelStateStore.record(isUp: false)
         stopProxy()
@@ -143,15 +145,23 @@ extension ProxyPacketTunnelProvider {
         guard let descriptor = Socks5Tunnel.tunnelFileDescriptor else {
             throw NSError.newError("Tunnel failed to find its utun interface")
         }
-        // hev-socks5-tunnel's main loop blocks until the tunnel stops, so it gets a thread of its own
-        // instead of a cooperative-pool thread.
-        let thread = Thread {
-            let exitCode = Socks5Tunnel.run(configurationPath: configurationFilePath, descriptor: descriptor)
-            logger.info("hev-socks5-tunnel exited with \(exitCode, privacy: .public)")
+        // `nonisolated(unsafe)`: the provider is not Sendable, and the loop's thread only cancels the tunnel through it,
+        // which writes stores and calls NetworkExtension, both safe from any thread.
+        nonisolated(unsafe) weak var provider = self
+        socks5TunnelLoop.start {
+            Socks5Tunnel.run(configurationPath: configurationFilePath, descriptor: descriptor)
+        } endedOnItsOwn: { exitCode in
+            provider?.cancelTunnel(socks5TunnelExitCode: exitCode)
         }
-        thread.name = "io.norselabs.dvpn.hev-socks5-tunnel"
-        thread.qualityOfService = .userInitiated
-        thread.start()
+    }
+
+    /// Cancels the tunnel whose hev-socks5-tunnel loop ended on its own: nothing reads its packets any more, so it
+    /// must not stay connected. As a failed start does, it records the tunnel down and writes the log file.
+    func cancelTunnel(socks5TunnelExitCode exitCode: Int32) {
+        logger.error("hev-socks5-tunnel stopped on its own with exit code \(exitCode, privacy: .public)")
+        TunnelStateStore.record(isUp: false)
+        ExtensionLogFile.dump()
+        cancelTunnelWithError(NSError.newError("hev-socks5-tunnel stopped on its own with exit code \(exitCode)"))
     }
 
     static func describe(_ reason: NEProviderStopReason) -> String {

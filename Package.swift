@@ -161,6 +161,7 @@ let package = Package(
                 .linkedFramework("CoreFoundation"),
             ]
         ),
+        .testTarget(name: "DVPNProxyProviderCoreTests", dependencies: ["DVPNProxyProviderCore"]),
         .testTarget(name: "WireGuardKitTests", dependencies: ["WireGuardKitTypes"], swiftSettings: [.swiftLanguageMode(.v5)]),
     ],
     swiftLanguageModes: [.v6]

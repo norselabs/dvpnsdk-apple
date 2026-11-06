@@ -27,6 +27,8 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   on the network path take the tunnel over. A pinned node is still checked against its pin alone.
 - A WireGuard or AmneziaWG tunnel whose runtime configuration lists no peer fails its start as one whose peer never
   answers does (`TunnelActivationError.handshakeTimedOut`), instead of staying connected with no traffic.
+- An Xray or Hysteria tunnel whose packet engine (hev-socks5-tunnel) stops on its own cancels itself
+  (`cancelTunnelWithError(_:)`) instead of staying connected with nothing reading its packets.
 
 ### Changed
 
