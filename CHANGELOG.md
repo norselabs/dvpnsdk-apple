@@ -5,6 +5,11 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ## Unreleased
 
+### Changed
+
+- A WireGuard or AmneziaWG tunnel to a backend node lets the system pick its local UDP port, instead of binding the
+  node's port on every interface of the device.
+
 ## 0.5.1 (2026-11-04)
 
 ### Fixed
