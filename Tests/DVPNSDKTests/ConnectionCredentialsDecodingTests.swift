@@ -193,18 +193,22 @@ struct ConnectionCredentialsDecodingTests {
         #expect(endpoint.parameters["Jc"] == nil, "junk-packet settings are chosen by the client, not the node")
     }
 
+    /// The legacy `awg` dictionary gives the keys a node sets (S, H, I), named as the typed metadata names them, and
+    /// nothing of the client's own: junk packets and timing.
     @Test
-    func amneziaWGLegacyDictionaryStillDecodes() throws {
+    func amneziaWGLegacyDictionaryGivesTheNodesKeysOnly() throws {
         var handshake = wireGuardHandshake
-        handshake["awg"] = ["Jc": "4", "Jmin": "40", "Jmax": "70", "S1": "15", "S2": "18", "H1": "123456"]
+        handshake["awg"] = [
+            "Jc": "65535", "Jmin": "65535", "Jmax": "70", "S1": "15", "s2": "18", "H1": "123456", "i2": "<b 0x01>",
+            "RekeyAfterTime": "0-1", "RekeyTimeout": "0-1", "HeaderProtectionKey": "k",
+        ]
         let data = try credentialsJSON(protocol: "AMNEZIAWG", handshake: handshake)
         let credentials = try JSONDecoder().decode(ConnectionCredentials.self, from: data)
 
         guard case let .amneziaWG(endpoint) = credentials.endpoint else {
             Issue.record("Expected AmneziaWG endpoint"); return
         }
-        #expect(endpoint.parameters["Jc"] == "4")
-        #expect(endpoint.parameters["H1"] == "123456")
+        #expect(endpoint.parameters == ["S1": "15", "S2": "18", "H1": "123456", "I2": "<b 0x01>"])
     }
 
     @Test
@@ -243,8 +247,14 @@ struct ConnectionCredentialsDecodingTests {
 
     // MARK: - The node's host
 
-    /// An IPv4 or IPv6 address, or a host name such as a V2Ray node's, is the endpoint's host as sent.
-    @Test(arguments: ["203.0.113.10", "2001:db8::1", "eu-at-1.suchnode.net"])
+    /// An IPv4 or IPv6 address, or a host name such as a V2Ray node's, is the endpoint's host as sent; so is a public
+    /// address next to a range the decoder refuses.
+    @Test(arguments: [
+        "203.0.113.10", "2001:db8::1", "eu-at-1.suchnode.net", "1node.example.com",
+        "9.255.255.255", "11.0.0.1", "100.63.255.255", "100.128.0.1", "126.255.255.255", "128.0.0.1", "169.253.0.1",
+        "169.255.0.1", "172.15.255.255", "172.32.0.1", "192.167.255.255", "192.169.0.1", "223.255.255.255",
+        "::2", "fbff::1", "fe7f::1", "fec0::1", "feff::1", "2001:4860:4860::8888",
+    ])
     func aNodesAddressOrNameIsItsHost(host: String) throws {
         let data = try credentialsJSON(protocol: "WIREGUARD", handshake: wireGuardHandshake, addrs: [host])
         let credentials = try JSONDecoder().decode(ConnectionCredentials.self, from: data)
@@ -255,10 +265,12 @@ struct ConnectionCredentialsDecodingTests {
         #expect(endpoint.host == host)
     }
 
-    /// Anything else, which log lines and the WireGuard file would take as it is, fails the decoding.
+    /// Anything else, which log lines and the WireGuard file would take as it is, fails the decoding: so does a numeric
+    /// form other than four decimal numbers, which the system's resolver reads as an address (`127.1` is 127.0.0.1).
     @Test(arguments: [
         "node.example.com\nStarting the tunnel", "node example.com", "node/example.com", "node\"example.com", "",
         "-node.example.com", Array(repeating: String(repeating: "a", count: 50), count: 5).joined(separator: "."),
+        "127.1", "2130706433", "0x7f000001", "0x7f.1", "010.0.0.1", "192.168.1", "node.example.1",
     ])
     func anyOtherHostFailsTheDecoding(host: String) throws {
         let data = try credentialsJSON(protocol: "V2RAY", handshake: ["metadata": []], addrs: [host])
@@ -266,6 +278,24 @@ struct ConnectionCredentialsDecodingTests {
             try JSONDecoder().decode(ConnectionCredentials.self, from: data)
         } throws: { error in
             "\(error)".contains("is not an IP address or a host name")
+        }
+    }
+
+    /// An address of this device, a private or shared network, a link, multicast, or a reserved or IPv4-mapped range
+    /// fails the decoding: a node there would send the tunnel's traffic into the user's own network. One case per
+    /// range, at both ends where the range is not a whole first byte.
+    @Test(arguments: [
+        "0.0.0.0", "0.255.255.255", "10.0.0.1", "10.255.255.255", "100.64.0.0", "100.127.255.255", "127.0.0.1",
+        "127.255.255.254", "169.254.0.1", "169.254.169.254", "172.16.0.1", "172.31.255.255", "192.168.0.1",
+        "192.168.255.255", "224.0.0.1", "239.255.255.250", "240.0.0.1", "255.255.255.255",
+        "::", "::1", "fc00::1", "fdff:ffff::1", "fe80::1", "febf:ffff::1", "ff02::1", "::ffff:192.168.1.1", "::ffff:8.8.8.8",
+    ])
+    func aNonPublicAddressFailsTheDecoding(host: String) throws {
+        let data = try credentialsJSON(protocol: "V2RAY", handshake: ["metadata": []], addrs: [host])
+        #expect {
+            try JSONDecoder().decode(ConnectionCredentials.self, from: data)
+        } throws: { error in
+            "\(error)".contains("is not a public address")
         }
     }
 }

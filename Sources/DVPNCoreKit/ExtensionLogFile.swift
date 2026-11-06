@@ -73,8 +73,10 @@ public enum ExtensionLogFile {
             let stamp = ISO8601DateFormatter()
             stamp.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             var lines = ["# \(process) log, the hour before \(stamp.string(from: now))"]
+            // One line per entry: a line break a message quotes from a node is escaped, so it cannot forge an entry.
             for case let entry as OSLogEntryLog in entries {
-                lines.append("\(stamp.string(from: entry.date)) \(entry.process)[\(entry.category)] \(name(of: entry.level)): \(entry.composedMessage)")
+                let message = entry.composedMessage.escapingControlCharacters
+                lines.append("\(stamp.string(from: entry.date)) \(entry.process)[\(entry.category)] \(name(of: entry.level)): \(message)")
             }
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let url = directory.appendingPathComponent("\(process).log")

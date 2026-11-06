@@ -11,7 +11,7 @@ them alone ([The tunnels with your own API client](#the-tunnels-with-your-own-ap
 |---|---|---|
 | WireGuard and AmneziaWG | [amneziawg-go](https://github.com/amnezia-vpn/amneziawg-go) through WireGuardKit | One engine: amneziawg-go is a superset of wireguard-go, and a configuration without AmneziaWG keys is plain WireGuard. |
 | Xray and V2Ray | [Xray-core](https://github.com/XTLS/Xray-core) through [libXray](https://github.com/XTLS/libXray), with [hev-socks5-tunnel](https://github.com/heiher/hev-socks5-tunnel) | One engine for both node types: `XRAY` and `V2RAY` (the earlier node format, still deployed; TLS is detected when the tunnel starts). VMess, VLESS (REALITY, XHTTP, Vision) and Trojan. Optional TLS ClientHello fragmentation. |
-| Hysteria 2 | [apernet/hysteria](https://github.com/apernet/hysteria) through `GoBridge/libhysteria`, with hev-socks5-tunnel | Salamander obfuscation, `hysteria2://` URIs. |
+| Hysteria 2 | [apernet/hysteria](https://github.com/apernet/hysteria) through `GoBridge/libhysteria`, with hev-socks5-tunnel | Salamander obfuscation and certificate pinning. |
 
 Requirements: iOS 18, macOS 15 or tvOS 18; Xcode 16 or later; Swift 6.
 
@@ -204,12 +204,18 @@ The model can also be filled in field by field from the same answer:
 | Hysteria 2 | `.hysteria(HysteriaEndpoint(host:port:auth:sni:obfsPassword:insecure:tlsPin:))` | `uid` when the node sent no `auth` |
 
 Which inbound of an Xray or V2Ray node to dial, TLS trust and the fallbacks are decided by `DVPNTunnel` either way,
-so the result is the same as with the SDK's own client.
+so the result is the same as with the SDK's own client. So are the checks on what a node sends: `start(from:)` refuses
+a node address the decoder would refuse (`TunnelsServiceError.refusedNodeAddress`), and takes only the AmneziaWG keys
+a node sets.
 
 ## How it is built
 
 - **The SDK decodes, the tunnel decides.** `DVPNSDK` decodes a node's handshake as the node sent it; which inbound to
   dial, TLS trust and every fallback are decided in `DVPNTunnel`, next to their tests.
+- **What a node sends is checked before it is used.** The decoder refuses a node address that does not lead to the
+  internet, reads no AmneziaWG key a node does not set, and drops format and control characters from server and city
+  names; the tunnel layer refuses AmneziaWG values that could crash the engine or add settings, an Xray inbound with
+  values Xray-core would refuse, and trusts an unpinned Hysteria node only through the system's roots.
 - **Only `DVPNTunnel` imports `DVPNSDK`.** Everything an extension runs stays free of the backend client (lint enforces
   it).
 - **Mirrors.** When the API cannot be reached, requests go to mirrors: other hosts from the mirror lists, or the API
@@ -252,7 +258,8 @@ the SDK's lines too. A line holds only what may leave the device:
 How the SDK keeps to it: every error goes through one helper (`logDescription`; in `DVPNSDK`, the transport's
 `describeFailure`), and lint stops an error being logged whole. Before Xray's or Hysteria's start error is logged or
 recorded, every credential the provider holds is replaced with "…"; WireGuard's engine lines name only the node.
-Xray's own log is off.
+Xray's own log is off. A provider's log file and its recorded start error keep each entry on one line, line breaks and
+other control characters escaped, so text an engine quotes from a node cannot read as an entry of its own.
 
 ## Building the engines
 

@@ -184,9 +184,15 @@ public struct XrayInbound: Equatable, Sendable {
 /// A WireGuard endpoint plus the AmneziaWG obfuscation parameters.
 ///
 /// `parameters` carries the raw `[Interface]` keys exactly as they appear in an AmneziaWG
-/// configuration (`Jc`, `Jmin`, `Jmax`, `S1`–`S4`, `H1`–`H4`, `I1`–`I5`, …). Validation and
-/// typing happen in the tunnel layer, which owns the AmneziaWG model.
+/// configuration. A decoded node's are the ones a node sets (`nodeParameterKeys`); the tunnel layer takes
+/// only those from any endpoint, validates and types them, since it owns the AmneziaWG model.
 public struct AmneziaWGEndpoint: Equatable, Sendable {
+    /// The `[Interface]` keys a node sets: `S1`–`S4`, `H1`–`H4` and `I1`–`I5`, which shape the handshake both ends
+    /// must agree on. The junk packets (`Jc`, `Jmin`, `Jmax`), the timing keys and the rest are the client's own.
+    package static let nodeParameterKeys: Set<String> = [
+        "S1", "S2", "S3", "S4", "H1", "H2", "H3", "H4", "I1", "I2", "I3", "I4", "I5",
+    ]
+
     public let wireGuard: WireGuardEndpoint
     public let parameters: [String: String]
 
@@ -200,14 +206,14 @@ public struct AmneziaWGEndpoint: Equatable, Sendable {
 
 /// A `HYSTERIA2` node as described by its handshake metadata (`sentinel-go-sdk/hysteria2`). Strings the
 /// node left empty are `nil`. The tunnel layer fills `auth` from the credentials' `uid` when the node
-/// sent none, and decides trust from `insecure` and `tlsPin`.
+/// sent none, and decides trust: a pinned node through its pin, any other through the system's roots.
 public struct HysteriaEndpoint: Equatable, Sendable {
     public let host: String
     public let port: UInt16
     public let auth: String?
     public let sni: String?
     public let obfsPassword: String?
-    /// The node's `insecure` flag; `nil` when absent.
+    /// The node's `insecure` flag; `nil` when absent. The tunnel layer does not act on it.
     public let insecure: Bool?
     /// SHA-256 fingerprint of the node's TLS certificate (hex, with or without colons).
     public let tlsPin: String?
@@ -246,7 +252,7 @@ struct WireGuardHandshakeData: Decodable {
 /// AmneziaWG handshake payload: the WireGuard fields plus the node's obfuscation parameters
 /// (`sentinel-go-sdk/amneziawg/metadata.go`): `s1`–`s4`, `h1`–`h4` and optional `i1`–`i5` live on
 /// `metadata[0]`. Junk-packet settings (`Jc`/`Jmin`/`Jmax`) are local and chosen by the client.
-/// A legacy top-level `awg` dictionary is still honoured when present.
+/// A legacy top-level `awg` dictionary is still read, for the keys a node sets only.
 struct AmneziaWGHandshakeData: Decodable {
     struct Metadata: Decodable {
         let s1: UInt16?
@@ -269,7 +275,10 @@ struct AmneziaWGHandshakeData: Decodable {
 
     /// The `[Interface]` keys exactly as AmneziaWG configs spell them.
     var parameters: [String: String] {
-        var result = awg ?? [:]
+        var result: [String: String] = [:]
+        for (key, value) in awg ?? [:] where AmneziaWGEndpoint.nodeParameterKeys.contains(key.uppercased()) {
+            result[key.uppercased()] = value
+        }
         guard let first = metadata.first else { return result }
         let numbers: [(String, (any BinaryInteger)?)] = [
             ("S1", first.s1), ("S2", first.s2), ("S3", first.s3), ("S4", first.s4),

@@ -78,4 +78,37 @@ struct XrayNodeSelectionTests {
         ])
         #expect(throws: XrayNodeSelection.Error.noUsableInbound) { try XrayNodeSelection.model(for: node, uuid: uuid) }
     }
+
+    /// REALITY values Xray-core would refuse, and quote whole in its error, are not dialled: a line break in them would
+    /// reach the logs.
+    @Test(arguments: [
+        ("abc\n2026-11-06 forged", "0123456789abcdef", "www.apple.com"),
+        ("SOJ1ByzX8rQZ6KJ7z5nY2F9A4fVpzB0rQdL6wMhzk9", "", ""),             // 42 characters
+        ("SOJ1ByzX8rQZ6KJ7z5nY2F9A4fVpzB0rQdL6wMhzk9+", "", ""),            // standard base64, not base64url
+        ("SOJ1ByzX8rQZ6KJ7z5nY2F9A4fVpzB0rQdL6wMhzk9Q", "0123456789abcdef01", ""), // short ID past 16 digits
+        ("SOJ1ByzX8rQZ6KJ7z5nY2F9A4fVpzB0rQdL6wMhzk9Q", "abc", ""),          // an odd number of digits
+        ("SOJ1ByzX8rQZ6KJ7z5nY2F9A4fVpzB0rQdL6wMhzk9Q", "zz\n", ""),
+        ("SOJ1ByzX8rQZ6KJ7z5nY2F9A4fVpzB0rQdL6wMhzk9Q", "\u{FF11}\u{FF12}", ""),                 // fullwidth digits
+        ("SOJ1ByzX8rQZ6KJ7z5nY2F9A4fVpzB0rQdL6wMhzk9Q", "", "www.apple.com\nx"),
+    ])
+    func malformedRealityValuesAreNotDialled(publicKey: String, shortID: String, serverName: String) {
+        let malformed = XrayInbound.Reality(serverName: serverName, shortID: shortID, publicKey: publicKey, fingerprint: "chrome")
+        #expect(!XrayNodeSelection.isUsable(XrayInbound(port: 1, proxyProtocol: .vless, transport: .tcp, security: .reality, reality: malformed)))
+        // An empty short ID and server name are Xray-core's to accept, as before.
+        let wellFormed = XrayInbound.Reality(serverName: "", shortID: "", publicKey: reality.publicKey, fingerprint: "chrome")
+        #expect(XrayNodeSelection.isUsable(XrayInbound(port: 1, proxyProtocol: .vless, transport: .tcp, security: .reality, reality: wellFormed)))
+    }
+
+    /// One SHA-256 pin, colons allowed; nothing else is dialled.
+    @Test(arguments: [
+        ("abababababababababababababababababababababababababababababababab", true),
+        ("AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB:AB", true),
+        ("abababababababababababababababababababababababababababababababa", false),
+        ("abababababababababababababababababababababababababababababababab,cdcd", false),
+        ("abababababababababababababababababababababababababababababababab\n", false),
+        (String(repeating: "\u{FF11}", count: 64), false),
+    ])
+    func aTLSInboundNeedsOneCertificatePin(pin: String, isUsable: Bool) {
+        #expect(XrayNodeSelection.isUsable(XrayInbound(port: 1, proxyProtocol: .vless, transport: .tcp, security: .tls, tlsPin: pin)) == isUsable)
+    }
 }

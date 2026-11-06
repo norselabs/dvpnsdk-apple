@@ -5,6 +5,45 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ## Unreleased
 
+### Added
+
+- `TunnelsServiceError.refusedNodeAddress`: `TunnelManager.start(from:)` refuses a node whose address
+  `ConnectionCredentials` would not decode, so credentials built by hand get the same checks.
+
+### Fixed
+
+- A node's address must lead to the internet: `ConnectionCredentials` no longer decodes, and
+  `TunnelManager.start(from:)` no longer starts, a node at an address of the device itself, a private or shared
+  network (10/8, 100.64/10, 172.16/12, 192.168/16, fc00::/7), a link (169.254/16, fe80::/10), multicast, or the
+  0/8, 240/4 or IPv4-mapped ranges, which would send the tunnel's traffic into the user's own network. An IPv4
+  address must be four decimal numbers, and a host name's last label must start with a letter: the system's resolver
+  reads forms such as `127.1` or `0x7f000001` as addresses.
+- An AmneziaWG node's values cannot crash the WireGuard extension or add settings: `applyAmneziaWG(_:)` refuses a
+  value with a line break or control character, an `S4` above 388 (past which a packet no longer fits the engine's
+  1700-byte buffer on iOS and tvOS), and an `I1`–`I5` that is not `<b>`, `<t>`, `<r>`, `<rc>` and `<rd>` tags with
+  sizes from 0, at most 1280 bytes. A refused value is logged by its key and length only.
+- A Hysteria node that sends `insecure` without a certificate pin (`HysteriaEndpoint.tlsPin`) must show a
+  certificate the system trusts for its name: the flag no longer switches certificate checking off, which let a party
+  on the network path take the tunnel over. A pinned node is still checked against its pin alone.
+
+### Changed
+
+- An AmneziaWG node sets `S1`–`S4`, `H1`–`H4` and `I1`–`I5` only: `ConnectionCredentials` reads no other key from
+  the handshake's `awg` dictionary, and `TunnelManager.start(from:)` drops any other key of
+  `AmneziaWGEndpoint.parameters`, credentials built by hand included. The junk packets (`Jc`, `Jmin`, `Jmax`) are the
+  SDK's own (`AmneziaWGJunkDefaults`), and the timing keys keep the engine's defaults.
+- An `XRAY` inbound is dialled only when its values are ones Xray-core accepts: a TLS pin is one SHA-256 digest in
+  hex (colons allowed), and a REALITY public key is 32 bytes in unpadded base64url, its short ID up to 16 hex digits
+  in pairs, and its server name empty or a host name. Xray-core quotes a malformed value whole in its error.
+- The packet tunnel providers' log files (`ExtensionLogFile`) and their recorded start errors keep each entry on one
+  line: line breaks and other control characters in a message are escaped, so text an engine quotes from a node
+  cannot add lines that read as entries of their own.
+- `Server.name` and `City.name` are decoded without format characters (such as bidi overrides, which can reorder the
+  text shown after a name) or control characters, and cut to 100 characters and 400 Unicode scalars: the names come
+  from the node operators.
+- A WireGuard or AmneziaWG tunnel to a backend node lets the system pick its local UDP port, instead of binding the
+  node's port on every interface of the device.
+
 ## 0.5.1 (2026-11-04)
 
 ### Fixed

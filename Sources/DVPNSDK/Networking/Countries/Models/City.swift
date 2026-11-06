@@ -28,4 +28,14 @@ public struct City: Codable, Equatable, Hashable, Sendable {
         case country
         case serversAvailable = "servers_available"
     }
+
+    /// The name comes from the node operators' data: it is kept as `String.displayName` shows it.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        countryID = try container.decode(String.self, forKey: .countryID)
+        name = try container.decode(String.self, forKey: .name).displayName
+        serversAvailable = try container.decode(Int.self, forKey: .serversAvailable)
+        country = try container.decodeIfPresent(Country.self, forKey: .country)
+    }
 }

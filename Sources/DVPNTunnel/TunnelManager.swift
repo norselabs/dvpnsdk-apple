@@ -93,6 +93,7 @@ extension TunnelManager {
     /// Starts the tunnel engine that serves the credentials' node type. Returns once connected (and,
     /// for the WireGuard family, once the first handshake is seen).
     public func start(from credentials: ConnectionCredentials) async throws(TunnelsServiceError) {
+        try checkAddress(of: credentials)
         logStart(of: credentials)
         switch credentials.nodeType.tunnelProtocolID {
         case .wireGuard:
@@ -144,8 +145,10 @@ extension TunnelManager {
             amneziaParameters = [:]
         case let .amneziaWG(endpoint):
             wg = endpoint.wireGuard
-            // Nodes send the handshake-affecting S/H/I values only; junk packets are our choice.
-            amneziaParameters = AmneziaWGJunkDefaults.filling(endpoint.parameters)
+            // A node sets the handshake's S, H and I values only; junk packets and timing are the client's.
+            amneziaParameters = AmneziaWGJunkDefaults.filling(endpoint.parameters.filter {
+                AmneziaWGEndpoint.nodeParameterKeys.contains($0.key.uppercased())
+            })
         case .v2ray, .xrayNode, .hysteria:
             throw .emptyCredentials
         }
@@ -196,9 +199,10 @@ extension TunnelManager {
         model.interfaceModel[.dns] = dns
         model.interfaceModel[.addresses] = "\(wg.clientAddress)/32"
         model.interfaceModel[.mtu] = ""
+        // The system picks the local port: the node's port is where the node listens, not one for this device to bind.
+        model.interfaceModel[.listenPort] = ""
 
         let port = String(wg.port)
-        model.interfaceModel[.listenPort] = port
         // An IPv6 address goes in brackets, as wg-quick writes it: without them the endpoint's parser, which also checks
         // the host's characters, takes the host up to its first colon.
         let host = IPv6Address(wg.host) == nil ? wg.host : "[\(wg.host)]"

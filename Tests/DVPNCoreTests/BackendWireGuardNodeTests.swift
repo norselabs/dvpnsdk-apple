@@ -57,7 +57,7 @@ struct BackendWireGuardNodeTests {
         let interface = configuration.interface
         #expect(interface.privateKey.base64Key == privateKey.base64Key)
         #expect(interface.addresses.map(\.stringRepresentation) == ["10.10.0.2/32"])
-        #expect(interface.listenPort == 51820)
+        #expect(interface.listenPort == nil, "the system picks the local port, not the node")
         #expect(interface.mtu == nil)
         #expect(interface.dns.map(\.stringRepresentation) == ["1.1.1.1", "1.0.0.1"])
         #expect(!configuration.hasAmneziaWGParameters, "the model never carried AWG fields; make sure that stays true")
@@ -66,6 +66,7 @@ struct BackendWireGuardNodeTests {
         let text = configuration.asWgQuickConfig()
         #expect(!text.contains("PresharedKey"))
         #expect(!text.contains("MTU"))
+        #expect(!text.contains("ListenPort"))
     }
 
     /// A node's IPv6 address goes in brackets, as wg-quick writes it; an IPv4 address and a host name stay as they are.

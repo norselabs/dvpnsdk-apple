@@ -52,6 +52,32 @@ struct ResponseDecodingTests {
         #expect(server.address == "sentnode1a")
     }
 
+    /// A node's or city's name loses format characters (bidi overrides that reorder the protocol shown after it) and
+    /// control characters, and is cut to 100 characters.
+    @Test
+    func aNameKeepsNoFormatOrControlCharacterAndIsCut() throws {
+        let tail = String(repeating: "x", count: 500)
+        let serverJSON = try JSONSerialization.data(withJSONObject: [
+            "id": "s1", "country_id": "de", "city_id": "ber", "load": 0.4, "is_available": true, "protocol": "XRAY",
+            "name": "Official \u{202E}2YRETSYH\u{202C} node\u{0007}\u{0000}\n\(tail)",
+        ])
+        let server = try JSONDecoder().decode(Server.self, from: serverJSON)
+        #expect(server.name == String("Official 2YRETSYH node\(tail)".prefix(100)))
+
+        let city = try decode(City.self, #"{"id":"ber","country_id":"de","name":"Ber⁦lin\u0007","servers_available":2}"#)
+        #expect(city.name == "Berlin")
+
+        // A stored server reads back the same.
+        #expect(try JSONDecoder().decode(Server.self, from: JSONEncoder().encode(server)) == server)
+
+        // Combining marks stacked on one character count towards the cut: at most 400 scalars in all.
+        let stacked = "Node " + "A" + String(repeating: "\u{0301}", count: 5000) + " B"
+        let stackedCity = try JSONDecoder().decode(City.self, from: JSONSerialization.data(withJSONObject: [
+            "id": "ber", "country_id": "de", "name": stacked, "servers_available": 2,
+        ]))
+        #expect(stackedCity.name == "Node ")
+    }
+
     @Test
     func verifyDeviceResponse() throws {
         let response = try decode(VerifyDeviceResponse.self, #"{"id":"dev-1","is_enrolled":true,"is_banned":false}"#)
