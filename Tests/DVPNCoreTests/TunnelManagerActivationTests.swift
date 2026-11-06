@@ -115,11 +115,12 @@ struct TunnelManagerActivationTests {
         }
     }
 
-    @Test
-    func aWireGuardTunnelWithoutAHandshakeIsStopped() async throws {
+    /// A peer that never answers, and a runtime configuration that lists no peer, which never carries traffic either.
+    @Test(arguments: ["public_key=abc\nlast_handshake_time_sec=0\nrx_bytes=0\n", "private_key=00\nlisten_port=0\n"])
+    func aWireGuardTunnelWithoutAHandshakeIsStopped(runtimeConfiguration: String) async throws {
         let profile = FakeTunnelProfile(name: "WireGuard", providerBundleID: "com.example.vpn.wireguard-ne")
         profile.isOnDemandEnabled = true
-        profile.messageAnswer = Data("public_key=abc\nlast_handshake_time_sec=0\nrx_bytes=0\n".utf8)
+        profile.messageAnswer = Data(runtimeConfiguration.utf8)
         var announcedBeforeTheStop = false
         profile.onStop = { [unowned profile] in
             announcedBeforeTheStop = profile.messages.contains(ExtensionLogFile.failedStopNotice)

@@ -297,16 +297,15 @@ extension TunnelContainer {
     }
 
     /// Reads the peer's handshake state from UAPI `get=1` text. `rx_bytes > 0` counts as a handshake
-    /// too: data can only be decrypted after one.
+    /// too: data can only be decrypted after one. A configuration that lists no peer is pending as well: it never
+    /// carries traffic, so the wait runs out as for a peer that never answers.
     nonisolated static func handshakeProbe(runtimeConfiguration: String) -> HandshakeProbe {
-        var sawPeer = false
         for line in runtimeConfiguration.split(separator: "\n") {
             for key in ["last_handshake_time_sec=", "rx_bytes="] where line.hasPrefix(key) {
-                sawPeer = true
                 if (Int(line.dropFirst(key.count)) ?? 0) > 0 { return .completed }
             }
         }
-        return sawPeer ? .pending : .unavailable("runtime configuration lists no peer (\(runtimeConfiguration.count) bytes)")
+        return .pending
     }
 }
 

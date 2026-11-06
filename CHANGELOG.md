@@ -25,6 +25,8 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 - A Hysteria node that sends `insecure` without a certificate pin (`HysteriaEndpoint.tlsPin`) must show a
   certificate the system trusts for its name: the flag no longer switches certificate checking off, which let a party
   on the network path take the tunnel over. A pinned node is still checked against its pin alone.
+- A WireGuard or AmneziaWG tunnel whose runtime configuration lists no peer fails its start as one whose peer never
+  answers does (`TunnelActivationError.handshakeTimedOut`), instead of staying connected with no traffic.
 
 ### Changed
 
