@@ -5,6 +5,12 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ## Unreleased
 
+### Fixed
+
+- A Hysteria node that sends `insecure` without a certificate pin (`HysteriaEndpoint.tlsPin`) must show a
+  certificate the system trusts for its name: the flag no longer switches certificate checking off, which let a party
+  on the network path take the tunnel over. A pinned node is still checked against its pin alone.
+
 ### Changed
 
 - A WireGuard or AmneziaWG tunnel to a backend node lets the system pick its local UDP port, instead of binding the

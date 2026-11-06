@@ -24,14 +24,15 @@ struct HysteriaNodeConfigurationTests {
         #expect(configuration.obfs == .init(password: "salamander"))
     }
 
+    /// The node's `auth` and SNI are taken; its `insecure` without a pin is not, or the certificate went unchecked.
     @Test
-    func nodeValuesWinWhenSent() {
+    func nodeValuesWinWhenSentButTrust() {
         let endpoint = HysteriaEndpoint(host: "h", port: 1, auth: "secret", sni: "example.com", insecure: true)
         let configuration = TunnelManager.configuration(for: endpoint, uid: "uuid-1")
 
         #expect(configuration.auth == "secret")
         #expect(configuration.tls.sni == "example.com")
-        #expect(configuration.tls.insecure)
+        #expect(!configuration.tls.insecure, "an unpinned node is checked against the system's roots, whatever it sends")
         #expect(configuration.tls.pinSHA256 == nil)
         #expect(configuration.obfs == nil, "no password, no Salamander")
     }

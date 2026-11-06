@@ -200,14 +200,14 @@ public struct AmneziaWGEndpoint: Equatable, Sendable {
 
 /// A `HYSTERIA2` node as described by its handshake metadata (`sentinel-go-sdk/hysteria2`). Strings the
 /// node left empty are `nil`. The tunnel layer fills `auth` from the credentials' `uid` when the node
-/// sent none, and decides trust from `insecure` and `tlsPin`.
+/// sent none, and decides trust: a pinned node through its pin, any other through the system's roots.
 public struct HysteriaEndpoint: Equatable, Sendable {
     public let host: String
     public let port: UInt16
     public let auth: String?
     public let sni: String?
     public let obfsPassword: String?
-    /// The node's `insecure` flag; `nil` when absent.
+    /// The node's `insecure` flag; `nil` when absent. The tunnel layer does not act on it.
     public let insecure: Bool?
     /// SHA-256 fingerprint of the node's TLS certificate (hex, with or without colons).
     public let tlsPin: String?
