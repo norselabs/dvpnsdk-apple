@@ -29,6 +29,8 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   answers does (`TunnelActivationError.handshakeTimedOut`), instead of staying connected with no traffic.
 - An Xray or Hysteria tunnel whose packet engine (hev-socks5-tunnel) stops on its own cancels itself
   (`cancelTunnelWithError(_:)`) instead of staying connected with nothing reading its packets.
+- No request of the SDK follows an HTTP redirect: the API's, the mirror lists' and the health checks' sessions take
+  a redirect as the answer, so the device token goes only to the host asked.
 
 ### Changed
 

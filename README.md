@@ -220,7 +220,7 @@ a node sets.
   it).
 - **Mirrors.** When the API cannot be reached, requests go to mirrors: other hosts from the mirror lists, or the API
   behind a different TLS server name (SNI). An SNI mirror's certificate is trusted only when a configured root key
-  signed it.
+  signed it. No request follows a redirect.
 - **Backend nodes carry no certificate.** At each start the Xray extension handshakes with the node once and pins the
   certificate it presented, or uses plaintext when no TLS handshake completes.
 - **The proxy tunnels leave IPv6 out, on purpose.** The Xray and Hysteria tunnels claim the IPv4 default route and no
