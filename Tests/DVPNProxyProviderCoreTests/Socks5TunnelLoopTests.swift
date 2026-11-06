@@ -4,6 +4,7 @@
 //
 
 @testable import DVPNProxyProviderCore
+import Foundation
 import os
 import Testing
 
@@ -28,8 +29,12 @@ struct Socks5TunnelLoopTests {
         let loop = Socks5TunnelLoop()
         let ends = Ends()
 
+        // The loop runs on its own thread, so it may block there, as hev's does, until the stop has come.
+        loop.start {
+            Thread.sleep(forTimeInterval: 0.2)
+            return 0
+        } endedOnItsOwn: { ends.record($0) }
         loop.stop()
-        loop.start { 0 } endedOnItsOwn: { ends.record($0) }
 
         try await ends.wait()
         #expect(ends.exitCodes.isEmpty)
