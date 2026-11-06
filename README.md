@@ -11,7 +11,7 @@ them alone ([The tunnels with your own API client](#the-tunnels-with-your-own-ap
 |---|---|---|
 | WireGuard and AmneziaWG | [amneziawg-go](https://github.com/amnezia-vpn/amneziawg-go) through WireGuardKit | One engine: amneziawg-go is a superset of wireguard-go, and a configuration without AmneziaWG keys is plain WireGuard. |
 | Xray and V2Ray | [Xray-core](https://github.com/XTLS/Xray-core) through [libXray](https://github.com/XTLS/libXray), with [hev-socks5-tunnel](https://github.com/heiher/hev-socks5-tunnel) | One engine for both node types: `XRAY` and `V2RAY` (the earlier node format, still deployed; TLS is detected when the tunnel starts). VMess, VLESS (REALITY, XHTTP, Vision) and Trojan. Optional TLS ClientHello fragmentation. |
-| Hysteria 2 | [apernet/hysteria](https://github.com/apernet/hysteria) through `GoBridge/libhysteria`, with hev-socks5-tunnel | Salamander obfuscation, `hysteria2://` URIs. |
+| Hysteria 2 | [apernet/hysteria](https://github.com/apernet/hysteria) through `GoBridge/libhysteria`, with hev-socks5-tunnel | Salamander obfuscation and certificate pinning. |
 
 Requirements: iOS 18, macOS 15 or tvOS 18; Xcode 16 or later; Swift 6.
 
