@@ -59,8 +59,14 @@ struct APIErrorTests {
         #expect(APIError.answer(status: status, body: body).reason == expected)
     }
 
+    /// The SDK follows no redirect, so every redirect status reaches the client as its answer.
     @Test(arguments: [
-        (401, APIError.Reason.unauthorizedDevice),
+        (301, APIError.Reason.redirectionError),
+        (302, .redirectionError),
+        (303, .redirectionError),
+        (307, .redirectionError),
+        (308, .redirectionError),
+        (401, .unauthorizedDevice),
         (403, .deviceBanned),
         (425, .deviceNotEnrolled),
         (404, .notFound),
@@ -112,6 +118,7 @@ struct APIErrorTests {
         .unreachable(.dnsLookupFailed),
         .unreachable(.secureConnectionFailed),
         .backend(status: 503, code: "serverInactive"),
+        .backend(status: 307, code: nil),
     ])
     func anUnreachableBackendIsTransient(error: APIError) {
         #expect(error.isTransient)
