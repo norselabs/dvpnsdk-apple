@@ -116,7 +116,7 @@ public extension APIError {
 extension APIError.Reason {
     init?(status: Int) {
         switch status {
-        case 301, 302:
+        case 301, 302, 303, 307, 308:
             self = .redirectionError
         case 400:
             self = .invalidRequest

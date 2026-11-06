@@ -25,6 +25,15 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 - A Hysteria node that sends `insecure` without a certificate pin (`HysteriaEndpoint.tlsPin`) must show a
   certificate the system trusts for its name: the flag no longer switches certificate checking off, which let a party
   on the network path take the tunnel over. A pinned node is still checked against its pin alone.
+- A WireGuard or AmneziaWG tunnel whose runtime configuration lists no peer fails its start as one whose peer never
+  answers does (`TunnelActivationError.handshakeTimedOut`), instead of staying connected with no traffic.
+- An Xray or Hysteria tunnel whose packet engine (hev-socks5-tunnel) stops on its own cancels itself
+  (`cancelTunnelWithError(_:)`) instead of staying connected with nothing reading its packets.
+- No request of the SDK follows an HTTP redirect: the API's, the mirror lists' and the health checks' sessions take
+  a redirect as the answer, so the device token goes only to the host asked. Every redirect status (301, 302, 303,
+  307, 308) reads as `APIError.Reason.redirectionError`, which is transient.
+- The SNI mirror route checks every length its peer declares, in the certificate and in a chunked answer, against
+  the bytes it sent, and reads at most 16 MiB of an answer: a malformed certificate or chunk size no longer traps.
 
 ### Changed
 

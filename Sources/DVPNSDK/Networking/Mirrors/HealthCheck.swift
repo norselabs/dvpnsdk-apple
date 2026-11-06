@@ -9,7 +9,7 @@ enum HealthCheck {
     /// Whether a GET of `url` answers 2xx with `OK` in `data.status`, within `timeout`. Never throws; a cancelled caller
     /// cancels the request and gets `false`, so it checks `Task.isCancelled` before reading that as a failed probe.
     static func succeeds(url: URL, timeout: TimeInterval) async -> Bool {
-        let session = URLSession(configuration: .oneShot(timeout: timeout))
+        let session = URLSession.refusingRedirects(configuration: .oneShot(timeout: timeout))
         defer { session.finishTasksAndInvalidate() }
         do {
             let (data, response) = try await session.data(from: url)

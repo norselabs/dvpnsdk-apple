@@ -32,10 +32,9 @@ struct HandshakeProbeTests {
         #expect(TunnelContainer.handshakeProbe(runtimeConfiguration: configuration) == .pending)
     }
 
+    /// A configuration without a peer never gets a handshake: the wait runs out and the start fails.
     @Test
-    func configurationWithoutPeerIsUnavailable() {
-        guard case .unavailable = TunnelContainer.handshakeProbe(runtimeConfiguration: "private_key=00\nlisten_port=0\n") else {
-            Issue.record("expected unavailable"); return
-        }
+    func configurationWithoutPeerIsPending() {
+        #expect(TunnelContainer.handshakeProbe(runtimeConfiguration: "private_key=00\nlisten_port=0\n") == .pending)
     }
 }

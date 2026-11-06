@@ -20,7 +20,7 @@ struct MirrorsBootstrapService: Sendable {
         guard !urls.isEmpty else { throw MirrorError.bootstrapFailed }
 
         log.debug("bootstrap racing \(urls.count) URL(s)")
-        let session = URLSession(configuration: .oneShot(timeout: timeout))
+        let session = URLSession.refusingRedirects(configuration: .oneShot(timeout: timeout))
         defer { session.finishTasksAndInvalidate() }
 
         return try await withThrowingTaskGroup(of: [Mirror]?.self) { group in

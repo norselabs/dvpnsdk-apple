@@ -228,3 +228,115 @@ struct SNISpoofConnectStateTests {
         #expect(Self.isFailure(SNISpoofTransport.connectOutcome(of: .cancelled)))
     }
 }
+
+// MARK: - Declared lengths
+
+/// Every length the peer declares, in its certificate or its answer, is checked against the bytes behind it: a short
+/// or negative one fails the parse instead of trapping, and an answer that never ends stops at
+/// `SNISpoofTransport.maximumAnswerSize`.
+struct SNISpoofTransportBoundsTests {
+    private let transport = SNISpoofTransport(timeout: 5)
+
+    /// Certificates whose signature check cannot start: SEQUENCE { tbs, algorithm, BIT STRING } with one length wrong.
+    private static let malformedCertificates: [(String, [UInt8])] = [
+        // A BIT STRING of length 0, followed by one byte: no room for the unused-bits count.
+        ("empty signature", [0x30, 0x0C, 0x30, 0x02, 0x05, 0x00, 0x30, 0x02, 0x05, 0x00, 0x03, 0x00, 0x00]),
+        ("tbs past the data", [0x30, 0x05, 0x30, 0x7F, 0x00, 0x00, 0x00]),
+        ("algorithm past the data", [0x30, 0x08, 0x30, 0x02, 0x05, 0x00, 0x30, 0x7F, 0x05, 0x00]),
+        ("signature past the data", [0x30, 0x0E, 0x30, 0x02, 0x05, 0x00, 0x30, 0x02, 0x05, 0x00, 0x03, 0x7F, 0x00, 0x01, 0x02]),
+    ]
+
+    @Test(arguments: malformedCertificates)
+    func aLengthPastTheCertificateFailsTheParse(name _: String, bytes: [UInt8]) {
+        #expect(SNISpoofTransport.parseX509Signature(Data(bytes)) == nil)
+    }
+
+    private func chunked(size: String) -> Data {
+        Data("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n\(size)\r\nabcdef\r\n0\r\n\r\n".utf8)
+    }
+
+    @Test(arguments: ["-5", "7fffffffffffffff"])
+    func aChunkSizeTheBodyDoesNotHoldFailsTheParse(size: String) {
+        #expect(throws: SNISpoofTransport.TransportError.self) { try transport.parseResponse(chunked(size: size)) }
+    }
+
+    @Test
+    func aChunkTheBodyHoldsIsRead() throws {
+        #expect(try transport.parseResponse(chunked(size: "6")).body == Data("abcdef".utf8))
+    }
+
+    @Test
+    func anAnswerPastTheLimitFailsTheRead() async throws {
+        let peer = try await SendingPeer.start(sending: 2 * 1024 * 1024)
+        let connection = peer.connect()
+        defer {
+            connection.cancel()
+            peer.stop()
+        }
+
+        await #expect(throws: SNISpoofTransport.TransportError.self) {
+            try await transport.receiveAll(connection, limit: 1024 * 1024)
+        }
+    }
+
+    @Test
+    func anAnswerWithinTheLimitIsReadWhole() async throws {
+        let peer = try await SendingPeer.start(sending: 1024 * 1024)
+        let connection = peer.connect()
+        defer {
+            connection.cancel()
+            peer.stop()
+        }
+
+        #expect(try await transport.receiveAll(connection, limit: 1024 * 1024).count == 1024 * 1024)
+    }
+}
+
+/// A TCP peer on 127.0.0.1 that sends `size` bytes to whoever connects, then closes.
+private struct SendingPeer {
+    private let listener: NWListener
+    private let queue: DispatchQueue
+
+    static func start(sending size: Int) async throws -> SendingPeer {
+        let queue = DispatchQueue(label: "SendingPeer")
+        let parameters = NWParameters.tcp
+        parameters.requiredLocalEndpoint = .hostPort(host: .ipv4(.loopback), port: .any)
+        let listener = try NWListener(using: parameters)
+        listener.newConnectionHandler = { connection in
+            connection.start(queue: queue)
+            // The final message closes the peer's side once the bytes are out, which ends the read.
+            connection.send(
+                content: Data(repeating: 0x41, count: size),
+                contentContext: .finalMessage,
+                isComplete: true,
+                completion: .contentProcessed { _ in }
+            )
+        }
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+            listener.stateUpdateHandler = { state in
+                switch state {
+                case .ready:
+                    listener.stateUpdateHandler = nil
+                    continuation.resume()
+                case let .failed(error):
+                    listener.stateUpdateHandler = nil
+                    continuation.resume(throwing: error)
+                default:
+                    break
+                }
+            }
+            listener.start(queue: queue)
+        }
+        return SendingPeer(listener: listener, queue: queue)
+    }
+
+    func connect() -> NWConnection {
+        let connection = NWConnection(host: .ipv4(.loopback), port: listener.port ?? .any, using: .tcp)
+        connection.start(queue: queue)
+        return connection
+    }
+
+    func stop() {
+        listener.cancel()
+    }
+}

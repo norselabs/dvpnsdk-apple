@@ -62,7 +62,7 @@ public final class MirroredTransport: APITransport, Sendable {
     ) {
         self.configuration = configuration
         self.clock = clock
-        session = URLSession(configuration: sessionConfiguration)
+        session = .refusingRedirects(configuration: sessionConfiguration)
         self.freshSessionConfiguration = freshSessionConfiguration
         self.resolver = resolver
         self.isReachable = isReachable
@@ -443,7 +443,7 @@ private extension MirroredTransport {
     /// Sends `urlRequest` over the shared session, or over a throwaway one (its own connection pool, no cache) when the
     /// answer depends on the current network path; the throwaway session is invalidated once the answer is in.
     func exchange(_ urlRequest: URLRequest, sentToken: String?, freshConnection: Bool, progress: RequestProgress? = nil) async throws -> APIResponse {
-        let session = freshConnection ? URLSession(configuration: freshSessionConfiguration()) : session
+        let session = freshConnection ? .refusingRedirects(configuration: freshSessionConfiguration()) : session
         defer { if freshConnection { session.finishTasksAndInvalidate() } }
         return try await Self.load(urlRequest, sentToken: sentToken, on: session, progress: progress)
     }
