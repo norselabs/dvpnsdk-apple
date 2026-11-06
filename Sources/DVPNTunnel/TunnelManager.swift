@@ -145,8 +145,10 @@ extension TunnelManager {
             amneziaParameters = [:]
         case let .amneziaWG(endpoint):
             wg = endpoint.wireGuard
-            // Nodes send the handshake-affecting S/H/I values only; junk packets are our choice.
-            amneziaParameters = AmneziaWGJunkDefaults.filling(endpoint.parameters)
+            // A node sets the handshake's S, H and I values only; junk packets and timing are the client's.
+            amneziaParameters = AmneziaWGJunkDefaults.filling(endpoint.parameters.filter {
+                AmneziaWGEndpoint.nodeParameterKeys.contains($0.key.uppercased())
+            })
         case .v2ray, .xrayNode, .hysteria:
             throw .emptyCredentials
         }

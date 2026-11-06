@@ -193,18 +193,22 @@ struct ConnectionCredentialsDecodingTests {
         #expect(endpoint.parameters["Jc"] == nil, "junk-packet settings are chosen by the client, not the node")
     }
 
+    /// The legacy `awg` dictionary gives the keys a node sets (S, H, I), named as the typed metadata names them, and
+    /// nothing of the client's own: junk packets and timing.
     @Test
-    func amneziaWGLegacyDictionaryStillDecodes() throws {
+    func amneziaWGLegacyDictionaryGivesTheNodesKeysOnly() throws {
         var handshake = wireGuardHandshake
-        handshake["awg"] = ["Jc": "4", "Jmin": "40", "Jmax": "70", "S1": "15", "S2": "18", "H1": "123456"]
+        handshake["awg"] = [
+            "Jc": "65535", "Jmin": "65535", "Jmax": "70", "S1": "15", "s2": "18", "H1": "123456", "i2": "<b 0x01>",
+            "RekeyAfterTime": "0-1", "RekeyTimeout": "0-1", "HeaderProtectionKey": "k",
+        ]
         let data = try credentialsJSON(protocol: "AMNEZIAWG", handshake: handshake)
         let credentials = try JSONDecoder().decode(ConnectionCredentials.self, from: data)
 
         guard case let .amneziaWG(endpoint) = credentials.endpoint else {
             Issue.record("Expected AmneziaWG endpoint"); return
         }
-        #expect(endpoint.parameters["Jc"] == "4")
-        #expect(endpoint.parameters["H1"] == "123456")
+        #expect(endpoint.parameters == ["S1": "15", "S2": "18", "H1": "123456", "I2": "<b 0x01>"])
     }
 
     @Test
