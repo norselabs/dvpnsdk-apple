@@ -135,23 +135,22 @@ extension SNISpoofTransport {
         let tbsStart = offset
         guard skipTag(&offset, in: certData, expected: 0x30) else { return nil }
         guard let tbsContentLen = skipLength(&offset, in: certData) else { return nil }
-        offset += tbsContentLen
+        guard skip(tbsContentLen, &offset, in: certData) else { return nil }
         let tbsCertificate = certData[tbsStart ..< offset]
 
         guard skipTag(&offset, in: certData, expected: 0x30) else { return nil }
         guard let algLen = skipLength(&offset, in: certData) else { return nil }
         let algStart = offset
-        offset += algLen
+        guard skip(algLen, &offset, in: certData) else { return nil }
         let algBytes = certData[algStart ..< offset]
 
+        // The BIT STRING's first byte counts its unused bits; the signature is the rest.
         guard skipTag(&offset, in: certData, expected: 0x03) else { return nil }
-        guard let sigLen = skipLength(&offset, in: certData) else { return nil }
-        guard offset < certData.count else { return nil }
-
-        let unusedBits = certData[offset]
-        offset += 1
-        guard unusedBits == 0x00 else { return nil }
-        let signature = certData[offset ..< (offset + sigLen - 1)]
+        guard let sigLen = skipLength(&offset, in: certData), sigLen >= 1 else { return nil }
+        let sigStart = offset
+        guard skip(sigLen, &offset, in: certData) else { return nil }
+        guard certData[sigStart] == 0x00 else { return nil }
+        let signature = certData[(sigStart + 1) ..< offset]
 
         guard let algorithm = mapAlgorithm(Data(algBytes)) else { return nil }
 
@@ -161,6 +160,13 @@ extension SNISpoofTransport {
     // swiftformat:enable repeatedGuard
 
     // MARK: - ASN.1 helpers
+
+    /// Moves `offset` past the next `length` bytes, when `data` holds them; a declared length is the peer's word.
+    private static func skip(_ length: Int, _ offset: inout Int, in data: Data) -> Bool {
+        guard length <= data.count - offset else { return false }
+        offset += length
+        return true
+    }
 
     private static func skipTag(_ offset: inout Int, in data: Data, expected: UInt8) -> Bool {
         guard offset < data.count, data[offset] == expected else { return false }
@@ -279,8 +285,15 @@ private extension SNISpoofTransport {
             })
         }
     }
+}
 
-    func receiveAll(_ connection: NWConnection) async throws -> Data {
+extension SNISpoofTransport {
+    /// The most an answer may hold, headers included: a bound for a peer that never ends its answer, which otherwise
+    /// only the request's timeout stops.
+    static let maximumAnswerSize = 16 * 1024 * 1024
+
+    /// Reads the answer until the peer closes, failing with `malformedResponse` once it passes `limit` bytes.
+    func receiveAll(_ connection: NWConnection, limit: Int = maximumAnswerSize) async throws -> Data {
         var buffer = Data()
         while true {
             let chunk: (Data?, Bool) = try await withCheckedThrowingContinuation { continuation in
@@ -293,6 +306,7 @@ private extension SNISpoofTransport {
                 }
             }
             if let data = chunk.0, !data.isEmpty {
+                guard data.count <= limit - buffer.count else { throw TransportError.malformedResponse }
                 buffer.append(data)
                 progress?.markStarted(.answer)
             }
@@ -389,7 +403,8 @@ extension SNISpoofTransport {
             }
             index = lineEnd.upperBound
             if size == 0 { break }
-            guard data.endIndex >= index + size + 2 else { throw TransportError.malformedResponse }
+            // The size is the peer's word: `Int(_:radix:)` also reads a negative one.
+            guard size >= 0, size <= data.endIndex - index - 2 else { throw TransportError.malformedResponse }
             output.append(data.subdata(in: index ..< (index + size)))
             index += size + 2 // skip trailing CRLF
         }

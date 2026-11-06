@@ -31,6 +31,8 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   (`cancelTunnelWithError(_:)`) instead of staying connected with nothing reading its packets.
 - No request of the SDK follows an HTTP redirect: the API's, the mirror lists' and the health checks' sessions take
   a redirect as the answer, so the device token goes only to the host asked.
+- The SNI mirror route checks every length its peer declares, in the certificate and in a chunked answer, against
+  the bytes it sent, and reads at most 16 MiB of an answer: a malformed certificate or chunk size no longer traps.
 
 ### Changed
 
