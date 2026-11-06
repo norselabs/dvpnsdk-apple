@@ -178,7 +178,7 @@ extension ConnectionCredentials: Decodable {
 
     /// An IPv4 or IPv6 address, or a host name: letters, digits and hyphens in dot-separated labels, none starting or
     /// ending with a hyphen, at most 253 characters.
-    static func isNodeHost(_ host: String) -> Bool {
+    package static func isNodeHost(_ host: String) -> Bool {
         if IPv4Address(host) != nil || IPv6Address(host) != nil { return true }
         guard !host.isEmpty, host.count <= 253 else { return false }
         return host.split(separator: ".", omittingEmptySubsequences: false).allSatisfy { label in

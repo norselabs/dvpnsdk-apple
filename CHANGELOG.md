@@ -13,6 +13,12 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ### Changed
 
+- An `XRAY` inbound is dialled only when its values are ones Xray-core accepts: a TLS pin is one SHA-256 digest in
+  hex (colons allowed), and a REALITY public key is 32 bytes in unpadded base64url, its short ID up to 16 hex digits
+  in pairs, and its server name empty or a host name. Xray-core quotes a malformed value whole in its error.
+- The packet tunnel providers' log files (`ExtensionLogFile`) and their recorded start errors keep each entry on one
+  line: line breaks and other control characters in a message are escaped, so text an engine quotes from a node
+  cannot add lines that read as entries of their own.
 - `Server.name` and `City.name` are decoded without format characters (such as bidi overrides, which can reorder the
   text shown after a name) or control characters, and cut to 100 characters and 400 Unicode scalars: the names come
   from the node operators.

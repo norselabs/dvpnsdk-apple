@@ -49,4 +49,22 @@ struct ExtensionLogFileTests {
         #expect(!text.contains(secret), "a private argument is not in the file")
         #expect(text.contains("<private>"))
     }
+
+    /// A line break in a message, such as one an engine's error quotes from a node, stays on its entry's line, escaped:
+    /// it cannot add a line that reads as an entry of its own.
+    @Test
+    func aLineBreakInAMessageStaysOnItsLine() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let marker = "ExtensionLogFileTests \(UUID().uuidString)"
+        let forged = "2026-11-06T12:00:00.000Z DVPN[Tunnel] notice: forged \(UUID().uuidString)"
+        makeLogger(category: "ExtensionLogFileTests").error("\(marker, privacy: .public): abc\n\(forged, privacy: .public)")
+
+        ExtensionLogFile.dump(into: directory)
+
+        let file = try #require(FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil).first)
+        let lines = try String(contentsOf: file, encoding: .utf8).split(separator: "\n")
+        #expect(!lines.contains { $0.hasPrefix(forged) }, "no line of the file starts with the forged text")
+        #expect(lines.contains { $0.contains(marker) && $0.hasSuffix(#": abc\n"# + forged) })
+    }
 }
