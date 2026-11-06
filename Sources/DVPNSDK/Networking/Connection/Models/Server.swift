@@ -65,4 +65,18 @@ extension Server: Codable {
         case serverProtocol = "protocol"
         case address
     }
+
+    /// The name is the node operator's text: it is kept as `String.displayName` shows it.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        countryID = try container.decode(String.self, forKey: .countryID)
+        country = try container.decodeIfPresent(Country.self, forKey: .country)
+        cityID = try container.decode(String.self, forKey: .cityID)
+        load = try container.decode(Double.self, forKey: .load)
+        name = try container.decode(String.self, forKey: .name).displayName
+        isAvailable = try container.decode(Bool.self, forKey: .isAvailable)
+        serverProtocol = try container.decode(String.self, forKey: .serverProtocol)
+        address = try container.decodeIfPresent(String.self, forKey: .address)
+    }
 }

@@ -13,6 +13,9 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ### Changed
 
+- `Server.name` and `City.name` are decoded without format characters (such as bidi overrides, which can reorder the
+  text shown after a name) or control characters, and cut to 100 characters and 400 Unicode scalars: the names come
+  from the node operators.
 - A WireGuard or AmneziaWG tunnel to a backend node lets the system pick its local UDP port, instead of binding the
   node's port on every interface of the device.
 
