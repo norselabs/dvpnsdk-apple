@@ -289,6 +289,40 @@ struct TunnelManagerActivationTests {
         }
     }
 
+    /// Credentials built by hand get the decoder's address checks too, before anything is logged, stored or saved: a
+    /// LAN address, a numeric form the resolver reads as loopback, and a host with a line break, for every node type.
+    @Test(arguments: ["192.168.1.1", "fe80::1", "127.1", "node.example.com\nStarting the tunnel to the WIREGUARD node"])
+    func aHandBuiltNodeAddressIsCheckedAtTheStart(host: String) async throws {
+        try await withConfigurationFilesOfItsOwn {
+            let wireGuard = FakeTunnelProfile(name: "WireGuard", providerBundleID: "com.example.vpn.wireguard-ne")
+            let xray = FakeTunnelProfile(name: "Xray", providerBundleID: "com.example.vpn.v2ray-ne")
+            let (manager, _) = makeManager([wireGuard, xray])
+            let uid = "11111111-2222-3333-4444-555555555555"
+            let key = "WAmgVYXkbT2bCtdcDwolI88/iqlDu4tf4B9Bl6qaJ0U="
+            let node = WireGuardEndpoint(
+                host: host, port: 51820, clientAddress: "10.10.0.2", peerPublicKey: "xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg="
+            )
+            let inbound = V2RayInbound(port: 8443, proxyProtocol: .vmess, transport: .grpc)
+            let credentials: [ConnectionCredentials] = [
+                ConnectionCredentials(nodeType: .wireguard, endpoint: .wireGuard(node), privateKey: key),
+                ConnectionCredentials(
+                    nodeType: .amneziawg, endpoint: .amneziaWG(AmneziaWGEndpoint(wireGuard: node, parameters: [:])), privateKey: key
+                ),
+                ConnectionCredentials(nodeType: .v2ray, endpoint: .v2ray(V2RayNodeEndpoint(host: host, inbounds: [inbound])), uid: uid),
+                ConnectionCredentials(nodeType: .xray, endpoint: .xrayNode(XrayNodeEndpoint(host: host, inbounds: [])), uid: uid),
+                ConnectionCredentials(nodeType: .hysteria, endpoint: .hysteria(HysteriaEndpoint(host: host, port: 443)), uid: uid),
+            ]
+            NodeAddressStore.record("sentnode1qx7previous")
+            defer { NodeAddressStore.record(nil) }
+
+            for credentials in credentials {
+                await #expect(throws: TunnelsServiceError.refusedNodeAddress) { try await manager.start(from: credentials) }
+            }
+            #expect(NodeAddressStore.load() == "sentnode1qx7previous")
+            #expect(wireGuard.saves + xray.saves == 0)
+        }
+    }
+
     /// Runs `body` with the configuration files in a directory of their own, removed afterwards: a test process cannot
     /// write the App Group container.
     private func withConfigurationFilesOfItsOwn(_ body: () async throws -> Void) async throws {

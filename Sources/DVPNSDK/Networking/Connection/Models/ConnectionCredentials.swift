@@ -115,6 +115,13 @@ extension ConnectionCredentials: Decodable {
                 debugDescription: "connection_handshake.response.addrs[0] is not an IP address or a host name"
             )
         }
+        guard !Self.isNonPublicAddress(host) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .addrs,
+                in: response,
+                debugDescription: "connection_handshake.response.addrs[0] is not a public address"
+            )
+        }
 
         let dataString = try response.decode(String.self, forKey: .data)
         guard let dataBytes = Data(base64Encoded: dataString) else {
@@ -176,15 +183,44 @@ extension ConnectionCredentials: Decodable {
         }
     }
 
-    /// An IPv4 or IPv6 address, or a host name: letters, digits and hyphens in dot-separated labels, none starting or
-    /// ending with a hyphen, at most 253 characters.
+    /// An IPv4 address written as four decimal numbers, an IPv6 address, or a host name: letters, digits and hyphens in
+    /// dot-separated labels, none starting or ending with a hyphen, the last starting with a letter, at most 253
+    /// characters. The system's resolver reads other numeric forms (`127.1`, `0x7f000001`, `2130706433`) as addresses,
+    /// which `isNonPublicAddress` would have to read the same way.
     package static func isNodeHost(_ host: String) -> Bool {
-        if IPv4Address(host) != nil || IPv6Address(host) != nil { return true }
+        if let address = IPv4Address(host) {
+            return host == address.rawValue.map(String.init).joined(separator: ".")
+        }
+        if IPv6Address(host) != nil { return true }
         guard !host.isEmpty, host.count <= 253 else { return false }
-        return host.split(separator: ".", omittingEmptySubsequences: false).allSatisfy { label in
+        let labels = host.split(separator: ".", omittingEmptySubsequences: false)
+        return labels.last?.first?.isLetter == true && labels.allSatisfy { label in
             !label.isEmpty && label.first != "-" && label.last != "-"
                 && label.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }
         }
+    }
+
+    /// Whether `host` is an IP address that does not lead to the internet: this device, a private or shared network, a
+    /// link, multicast, or a reserved or IPv4-mapped range. A node there would send the tunnel's traffic into the
+    /// user's own network. A host name is not checked here.
+    package static func isNonPublicAddress(_ host: String) -> Bool {
+        if let address = IPv4Address(host) {
+            let bytes = [UInt8](address.rawValue)
+            switch (bytes[0], bytes[1]) {
+            case (0, _), (10, _), (127, _), (169, 254), (192, 168), (224..., _): return true // 224/4 and 240/4
+            case (100, 64 ... 127), (172, 16 ... 31): return true
+            default: return false
+            }
+        }
+        if let address = IPv6Address(host) {
+            let bytes = [UInt8](address.rawValue)
+            let isUnspecifiedOrLoopback = bytes.prefix(15).allSatisfy { $0 == 0 } && bytes[15] <= 1
+            return isUnspecifiedOrLoopback || address.isIPv4Mapped
+                || bytes[0] & 0xFE == 0xFC // fc00::/7
+                || (bytes[0] == 0xFE && bytes[1] & 0xC0 == 0x80) // fe80::/10
+                || bytes[0] == 0xFF // ff00::/8
+        }
+        return false
     }
 
     private static func wireGuardEndpoint(

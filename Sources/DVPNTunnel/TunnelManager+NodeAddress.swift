@@ -9,6 +9,17 @@ import DVPNSDK
 // MARK: - Node address
 
 extension TunnelManager {
+    /// Refuses a node whose address the decoder would have refused: credentials built by hand never met its checks.
+    /// Runs before the start line, which logs the address.
+    func checkAddress(of credentials: ConnectionCredentials) throws(TunnelsServiceError) {
+        let host = credentials.endpoint.host
+        guard ConnectionCredentials.isNodeHost(host), !ConnectionCredentials.isNonPublicAddress(host) else {
+            let node = NodeAddressStore.describe(host: host.escapingControlCharacters, address: credentials.server?.address)
+            logger.error("Refused the \(credentials.nodeType.rawValue, privacy: .public) node \(node, privacy: .public): not a public address")
+            throw .refusedNodeAddress
+        }
+    }
+
     /// Logs the node a start connects to, before anything can fail.
     func logStart(of credentials: ConnectionCredentials) {
         logger.notice("\(Self.startLine(for: credentials), privacy: .public)")
@@ -27,9 +38,9 @@ extension TunnelManager {
     }
 }
 
-// MARK: - Private
+// MARK: - Host
 
-private extension ConnectionEndpoint {
+extension ConnectionEndpoint {
     var host: String {
         switch self {
         case let .wireGuard(endpoint): endpoint.host

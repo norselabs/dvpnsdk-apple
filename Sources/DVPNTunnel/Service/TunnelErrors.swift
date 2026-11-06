@@ -18,6 +18,10 @@ public enum TunnelsServiceError: Error, Sendable {
     case addTunnelFailed(systemError: Error)
     case removeTunnelFailed(systemError: Error)
     case emptyCredentials
+    /// The node's address is not one the SDK dials: not an IPv4 address in four decimal numbers, an IPv6 address or a
+    /// host name, or the address of this device, a private or shared network, a link, multicast, or a reserved or
+    /// IPv4-mapped range (`ConnectionCredentials` refuses the same when it decodes).
+    case refusedNodeAddress
     case unsupportedProtocol
     /// `TunnelManager.restart()` found nothing stored to start the tunnel from.
     case noStoredConfiguration
@@ -42,7 +46,8 @@ extension TunnelsServiceError: Equatable {
     public static func == (lhs: Self, rhs: Self) -> Bool {
         switch (lhs, rhs) {
         case (.emptyName, .emptyName), (.nameAlreadyExists, .nameAlreadyExists), (.emptyCredentials, .emptyCredentials),
-             (.unsupportedProtocol, .unsupportedProtocol), (.noStoredConfiguration, .noStoredConfiguration):
+             (.refusedNodeAddress, .refusedNodeAddress), (.unsupportedProtocol, .unsupportedProtocol),
+             (.noStoredConfiguration, .noStoredConfiguration):
             return true
         case let (.loadTunnelsFailed(lhs), .loadTunnelsFailed(rhs)), let (.addTunnelFailed(lhs), .addTunnelFailed(rhs)),
              let (.removeTunnelFailed(lhs), .removeTunnelFailed(rhs)):
@@ -72,6 +77,8 @@ extension TunnelsServiceError: CustomStringConvertible {
             return "Failed to remove tunnel"
         case .emptyCredentials:
             return "Failed to parse connection data"
+        case .refusedNodeAddress:
+            return "The node's address is not a public address"
         case .unsupportedProtocol:
             return "Unsupported protocol"
         case .noStoredConfiguration:
