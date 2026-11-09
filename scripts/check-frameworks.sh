@@ -3,7 +3,8 @@
 # the engine it is named after, and none links code this package keeps out of them — GPL or LGPL libraries, and in
 # LibXray what GoBridge/xray-core removes; LibXray's timeout reader has GoBridge/xray-core's fix, and so has the
 # handshake response its WebSocket and HTTPUpgrade dialers read, WireGuardKitGo runs on the patched Go runtime, and
-# HevSocks5Tunnel never starts hev-task-system's stack-overflow detector. The build scripts run it after a build, and
+# HevSocks5Tunnel never starts hev-task-system's stack-overflow detector and has GoBridge/hev-socks5-tunnel's session
+# cap fix. The build scripts run it after a build, and
 # scripts/check.sh and scripts/make-release-assets.sh before using what is there, so an engine built from the
 # unpatched sources is caught.
 #
@@ -62,6 +63,14 @@ starts_stack_detector() {
     xcrun nm -arch all -u "$1" 2>/dev/null | grep -q '_hev_task_stack_detector_new$'
 }
 
+# has_symbol <binary> <symbol>: whether every architecture defines the global symbol; false when none is listed.
+has_symbol() {
+    archs=$(lipo -archs "$1") && [ -n "$archs" ] || return 1
+    for arch in $archs; do
+        xcrun nm -arch "$arch" -g -U "$1" 2>/dev/null | grep -q " $2\$" || return 1
+    done
+}
+
 # verify <engine> <string only that engine holds> <its build script>
 verify() {
     engine=$1 signature=$2 script=$3
@@ -98,6 +107,13 @@ verify() {
             die "$framework/$slice runs on a Go runtime without GoBridge/wireguard's patch: run scripts/$script"
         [ "$engine" != HevSocks5Tunnel ] || ! starts_stack_detector "$binary" ||
             die "$framework/$slice starts hev-task-system's stack-overflow detector: run scripts/$script"
+        # The patch carrying upstream's session cap fix (it adds hev_socks5_tunnel_evict_session) leaves
+        # hev_socks5_tunnel_insert_session global; upstream's is static, so the check goes with the patch once a release
+        # carries the fix.
+        [ "$engine" != HevSocks5Tunnel ] ||
+            ! grep -qs hev_socks5_tunnel_evict_session GoBridge/hev-socks5-tunnel/*.patch ||
+            has_symbol "$binary" _hev_socks5_tunnel_insert_session ||
+            die "$framework/$slice lacks GoBridge/hev-socks5-tunnel's session cap fix: run scripts/$script"
     done
     echo "$framework: $(echo "$EXPECTED_SLICES" | wc -w | tr -d ' ') slices, nothing it must not link"
 }

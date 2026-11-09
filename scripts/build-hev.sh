@@ -5,7 +5,10 @@
 #
 #   scripts/build-hev.sh [--source <hev-socks5-tunnel checkout>]
 #
-# Without --source the release is cloned, with its submodules, into .build/hev-socks5-tunnel.
+# Without --source the release is cloned, with its submodules, into .build/hev-socks5-tunnel, and
+# reset there at each run; a --source checkout must have no local changes. The patches in
+# GoBridge/hev-socks5-tunnel are applied to it: max-session-count-churn.patch keeps a burst of new
+# sessions from passing the session cap.
 # Output slices: ios-arm64, ios-arm64_x86_64-simulator, macos-arm64_x86_64, tvos-arm64,
 # tvos-arm64_x86_64-simulator, re-packaged as static frameworks like the Go frameworks. Needs Xcode
 # (xcrun, clang, libtool, lipo, xcodebuild), make and python3; takes a few minutes.
@@ -59,6 +62,25 @@ if [ "$actual" != "$HEV_TAG" ]; then
     echo "error: $SOURCE is at $actual; this script builds $HEV_TAG (change HEV_TAG to move on)" >&2
     exit 1
 fi
+# GoBridge/hev-socks5-tunnel's patches, on the release as tagged: this script's own clone is reset from an earlier run,
+# and a checkout passed with --source must be unchanged.
+if [ "$SOURCE" = "$ROOT/.build/hev-socks5-tunnel" ]; then
+    git -C "$SOURCE" reset --quiet --hard
+    git -C "$SOURCE" clean --quiet -fd
+    git -C "$SOURCE" submodule --quiet foreach 'git reset --quiet --hard && git clean --quiet -fd'
+elif [ -n "$(git -C "$SOURCE" status --porcelain)" ]; then
+    echo "error: $SOURCE has local changes; pass a checkout of $HEV_TAG as released" >&2
+    exit 1
+fi
+PATCHES=""
+for patch in "$ROOT"/GoBridge/hev-socks5-tunnel/*.patch; do
+    [ -e "$patch" ] || continue
+    git -C "$SOURCE" apply "$patch" || {
+        echo "error: $(basename "$patch") does not apply to $HEV_TAG: update it" >&2
+        exit 1
+    }
+    PATCHES="$PATCHES $(basename "$patch")"
+done
 
 SLICES="$BUILD/slices"
 HEADERS="$BUILD/include"
@@ -152,7 +174,7 @@ print(json.dumps({"modules": modules}, indent=2))
 PYTHON
 
 {
-    echo "hev-socks5-tunnel: $HEV_TAG ($(git -C "$SOURCE" rev-parse --short HEAD))"
+    echo "hev-socks5-tunnel: $HEV_TAG ($(git -C "$SOURCE" rev-parse --short HEAD))${PATCHES:+ with$PATCHES}"
     for sub in hev-task-system lwip yaml; do
         echo "  third-part/$sub: $(git -C "$SOURCE/third-part/$sub" rev-parse --short HEAD)"
     done

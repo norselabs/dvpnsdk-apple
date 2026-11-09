@@ -115,27 +115,21 @@ open class ProxyPacketTunnelProvider: NEPacketTunnelProvider {
 // MARK: - Internal
 
 extension ProxyPacketTunnelProvider {
+#if os(macOS)
+    static let maxSessionCount = sessionCap(onMacOS: true)
+#else
+    static let maxSessionCount = sessionCap(onMacOS: false)
+#endif
+
+    /// hev-socks5-tunnel's session cap, TCP and UDP together, 0 for none: the session that reaches it ends the least
+    /// recently active one, so fewer stay open. Each session costs the Xray extension 100–150 KB, mostly in Xray, and iOS
+    /// ends an extension at 50 MB; tvOS's engines are built as iOS's. macOS sets no such limit.
+    static func sessionCap(onMacOS: Bool) -> Int {
+        onMacOS ? 0 : 100
+    }
+
     func startSocks5Tunnel(proxy: LocalProxy) throws {
-        // hev resets a TCP connection that carries nothing either way for 5 minutes, Xray's own idle limit, so a quiet
-        // session (SSH without keepalives, a long poll) outlasts a minute; a UDP association ends after a quiet minute.
-        let config = """
-        tunnel:
-          mtu: \(mtu)
-        socks5:
-          port: \(proxy.port)
-          address: \(LocalProxy.host)
-          udp: 'udp'
-          username: '\(proxy.username)'
-          password: '\(proxy.password)'
-        misc:
-          task-stack-size: 20480
-          connect-timeout: 5000
-          tcp-read-write-timeout: 300000
-          udp-read-write-timeout: 60000
-          log-file: stderr
-          log-level: error
-          limit-nofile: 65535
-        """
+        let config = Self.socks5TunnelConfiguration(mtu: mtu, proxy: proxy)
         let configurationFilePath = TunnelConfigDirectories.cachesDirectory
             .appending(component: "config.yml")
             .path(percentEncoded: false)
@@ -153,6 +147,31 @@ extension ProxyPacketTunnelProvider {
         } endedOnItsOwn: { exitCode in
             provider?.cancelTunnel(socks5TunnelExitCode: exitCode)
         }
+    }
+
+    /// hev-socks5-tunnel's YAML configuration.
+    static func socks5TunnelConfiguration(mtu: Int, proxy: LocalProxy) -> String {
+        // hev resets a TCP connection that carries nothing either way for 5 minutes, Xray's own idle limit, so a quiet
+        // session (SSH without keepalives, a long poll) outlasts a minute; a UDP association ends after a quiet minute.
+        """
+        tunnel:
+          mtu: \(mtu)
+        socks5:
+          port: \(proxy.port)
+          address: \(LocalProxy.host)
+          udp: 'udp'
+          username: '\(proxy.username)'
+          password: '\(proxy.password)'
+        misc:
+          task-stack-size: 20480
+          connect-timeout: 5000
+          tcp-read-write-timeout: 300000
+          udp-read-write-timeout: 60000
+          log-file: stderr
+          log-level: error
+          limit-nofile: 65535
+          max-session-count: \(maxSessionCount)
+        """
     }
 
     /// Cancels the tunnel whose hev-socks5-tunnel loop ended on its own: nothing reads its packets any more, so it

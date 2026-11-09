@@ -25,6 +25,7 @@ BUILD_ONLY = {"swift-syntax"}
 PATCHED = {
     "github.com/xtls/xray-core": "GoBridge/xray-core",
     "github.com/xtls/reality": "GoBridge/reality",
+    "github.com/heiher/hev-socks5-tunnel": "GoBridge/hev-socks5-tunnel",
 }
 
 
