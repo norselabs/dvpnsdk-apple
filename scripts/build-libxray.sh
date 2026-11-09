@@ -1,7 +1,7 @@
 #!/bin/sh
 # Builds Frameworks/LibXray.xcframework from XTLS/libXray (cgo c-archive mode), on the copies of
-# Xray-core (without the YAML and TOML config loaders, which libXray never uses, and with its timeout
-# reader fixed) and REALITY (without its fallback rate limiter, which links LGPL-3.0 code) that
+# Xray-core (without the YAML and TOML config loaders, which libXray never uses, and with the fixes
+# listed there) and REALITY (without its fallback rate limiter, which links LGPL-3.0 code) that
 # scripts/sync-patched-modules.sh generates. GoBridge/nogpl checks the licence of every linked module before
 # the build and writes their inventory (Frameworks/LibXray.licenses.json, for an app's licences list),
 # and scripts/check-frameworks.sh checks the binaries after it.

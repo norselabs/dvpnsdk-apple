@@ -1,12 +1,15 @@
 #!/bin/sh
 # Generates the patched copies of Xray-core and REALITY that LibXray is built with, so it links no
-# GPL or LGPL code and no config loader it does not use, with one fix:
+# GPL or LGPL code and no config loader it does not use, with these fixes:
 #
 # - Xray-core without its YAML and TOML config loaders (main/yaml, main/toml): libXray passes JSON
 #   only, and the loaders link two YAML libraries and go-toml.
 # - Xray-core's TimeoutWrapperReader returning buf.ErrReadTimeout when its wait runs out, as the pipe
 #   reader does (timeout-reader-error.patch): its empty read with no error made the VMess outbound
 #   end the request of an app that sends nothing for about 0.3 s plus the time to reach the node.
+# - Xray-core's REALITY client closing a connection whose server fails REALITY's verification
+#   (reality-no-spider.patch): it browsed the site that answered as a browser would, reading every
+#   page whole and keeping every link with no limit, and left the connection open.
 # - REALITY without its fallback rate limiter: it is built on github.com/juju/ratelimit (LGPL-3.0),
 #   and only a REALITY server uses it.
 #

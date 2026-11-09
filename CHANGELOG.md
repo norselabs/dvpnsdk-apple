@@ -34,6 +34,9 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   307, 308) reads as `APIError.Reason.redirectionError`, which is transient.
 - The SNI mirror route checks every length its peer declares, in the certificate and in a chunked answer, against
   the bytes it sent, and reads at most 16 MiB of an answer: a malformed certificate or chunk size no longer traps.
+- An Xray node whose REALITY answer fails verification can no longer make LibXray download without end: the REALITY
+  client closes the connection instead of browsing the site that answered, which read every page whole, kept every
+  link it found and left the connection open.
 
 ### Changed
 

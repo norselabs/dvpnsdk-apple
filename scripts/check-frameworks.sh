@@ -18,7 +18,8 @@ FORBIDDEN_EVERYWHERE='github.com/sagernet/|GPL-3.0 (sing, sing-shadowsocks)
 github.com/juju/ratelimit|LGPL-3.0'
 # Strings LibXray may not contain, removed by the patches in GoBridge/xray-core.
 FORBIDDEN_IN_XRAY='github.com/pelletier/go-toml|the TOML config loader, removed by no-yaml-toml.patch
-github.com/ghodss/yaml|the YAML config loader, removed by no-yaml-toml.patch'
+github.com/ghodss/yaml|the YAML config loader, removed by no-yaml-toml.patch
+href="([/h].*?)"|the REALITY client crawling the site that answered, removed by reality-no-spider.patch'
 
 die() {
     echo "check-frameworks: $*" >&2
