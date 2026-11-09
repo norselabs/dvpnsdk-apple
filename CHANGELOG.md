@@ -41,6 +41,9 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   never ends: LibXray's two dialers fail once the node has sent 64 KiB before the handshake ends, and HTTPUpgrade waits
   at most 8 s for the response, as WebSocket did, unless it dials through another outbound (`dialerProxy`, as
   ClientHello fragmentation does), whose connection ignores read deadlines.
+- An Xray or V2Ray node dialled over HTTPUpgrade can no longer crash the Xray extension by sending data in the same
+  packet as its upgrade response: LibXray reads those bytes first. Both dialers also close a connection whose
+  handshake fails, and give the TLS handshake 8 s, which had no limit.
 - Many connections at once no longer push the Xray extension past iOS's 50 MB memory limit, which restarted it and
   dropped the tunnel: on iOS and tvOS an Xray, V2Ray or Hysteria tunnel keeps fewer than 100 connections open, TCP and
   UDP together, and the one that reaches 100 ends the one idle longest. hev-socks5-tunnel carries its upstream fix that

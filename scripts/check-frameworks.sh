@@ -1,8 +1,9 @@
 #!/bin/sh
 # Checks the engines in Frameworks/ before they are used or released: each has the five slices, each slice holds
 # the engine it is named after, and none links code this package keeps out of them — GPL or LGPL libraries, and in
-# LibXray what GoBridge/xray-core removes; LibXray's timeout reader has GoBridge/xray-core's fix, and so has the
-# handshake response its WebSocket and HTTPUpgrade dialers read, WireGuardKitGo runs on the patched Go runtime, and
+# LibXray what GoBridge/xray-core removes; LibXray's timeout reader has GoBridge/xray-core's fix, and so have the
+# handshake its WebSocket and HTTPUpgrade dialers make and the response they read, WireGuardKitGo runs on the patched
+# Go runtime, and
 # HevSocks5Tunnel never starts hev-task-system's stack-overflow detector and has GoBridge/hev-socks5-tunnel's session
 # cap fix. The build scripts run it after a build, and
 # scripts/check.sh and scripts/make-release-assets.sh before using what is there, so an engine built from the
@@ -43,16 +44,27 @@ refuse() {
     done || die "rebuild it with its script in scripts/"
 }
 
-# has_timeout_reader_fix <binary>: whether every architecture's Go object returns buf.ErrReadTimeout from
-# TimeoutWrapperReader when its wait runs out (timeout-reader-error.patch); upstream's function never references it.
-has_timeout_reader_fix() {
-    symbol='_github.com/xtls/xray-core/common/buf.(*TimeoutWrapperReader).ReadMultiBufferTimeout'
+# Fixes of GoBridge/xray-core that leave no string of their own, one per line: a function of xray-core, a name its
+# relocations hold only with the fix, and the fix. Upstream's functions never reference those names.
+XRAY_CODE_FIXES='common/buf.(*TimeoutWrapperReader).ReadMultiBufferTimeout|common/buf.ErrReadTimeout|the timeout reader returning buf.ErrReadTimeout (timeout-reader-error.patch)
+transport/internet/httpupgrade.(*ConnRF).Read|httpupgrade.(*ConnRF).Read|HTTPUpgrade keeping what came with the 101 (handshake-response-limit.patch)
+transport/internet/httpupgrade.dialhttpUpgrade|_context.WithTimeout|HTTPUpgrade bounding its TLS handshake (handshake-response-limit.patch)'
+
+# lacks_xray_code_fix <binary>: the first of XRAY_CODE_FIXES an architecture's Go object lacks, or nothing.
+lacks_xray_code_fix() {
+    archs=$(lipo -archs "$1") && [ -n "$archs" ] || { echo "any architecture"; return; }
     work=$(mktemp -d)
-    for arch in $(lipo -archs "$1"); do
+    for arch in $archs; do
         lipo -thin "$arch" -output "$work/lib.a" "$1" 2>/dev/null || cp "$1" "$work/lib.a"
         (cd "$work" && ar x lib.a go.o)
-        objdump -d -r --disassemble-symbols="$symbol" "$work/go.o" | grep -q -F common/buf.ErrReadTimeout ||
-            { rm -rf "$work"; return 1; }
+        missing=$(echo "$XRAY_CODE_FIXES" | while IFS='|' read -r function name fix; do
+            # a relocation naming it (arm64, and data on x86_64), or a resolved call to it (x86_64); not the jump
+            # back to the function's own start that every Go function has
+            objdump -d -r --disassemble-symbols="_github.com/xtls/xray-core/$function" "$work/go.o" |
+                awk -v n="$name" '(/RELOC/ && substr($0, length($0) - length(n) + 1) == n) ||
+                    (/call/ && index($0, n ">")) { found = 1 } END { exit !found }' || { echo "$fix"; break; }
+        done)
+        [ -z "$missing" ] || { rm -rf "$work"; echo "$missing ($arch)"; return; }
     done
     rm -rf "$work"
 }
@@ -97,8 +109,10 @@ verify() {
         contains "$binary" "$signature" || die "$framework/$slice does not look like $engine (no $signature)"
         refuse "$binary" "$framework/$slice" "$FORBIDDEN_EVERYWHERE"
         [ "$engine" != LibXray ] || refuse "$binary" "$framework/$slice" "$FORBIDDEN_IN_XRAY"
-        [ "$engine" != LibXray ] || has_timeout_reader_fix "$binary" ||
-            die "$framework/$slice lacks GoBridge/xray-core's timeout reader fix: run scripts/$script"
+        if [ "$engine" = LibXray ]; then
+            lacking=$(lacks_xray_code_fix "$binary")
+            [ -z "$lacking" ] || die "$framework/$slice lacks $lacking: run scripts/$script"
+        fi
         # handshake-response-limit.patch's error, which upstream has no counterpart for.
         [ "$engine" != LibXray ] || contains "$binary" 'server handshake response longer than 64 KiB' ||
             die "$framework/$slice lacks GoBridge/xray-core's handshake response limit: run scripts/$script"

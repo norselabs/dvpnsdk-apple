@@ -14,6 +14,9 @@
 #   handshake response ends, HTTPUpgrade within 8 s as WebSocket already did (unless it dials
 #   through another outbound, whose connection ignores read deadlines)
 #   (handshake-response-limit.patch): Go's HTTP parser keeps a header line whole however long it is.
+#   The same patch keeps what an HTTPUpgrade server sends with its 101 for the first reads (upstream
+#   copied it into a buffer as short as the first read, an empty one on the dial, and panicked),
+#   closes a connection whose handshake fails, and gives both dialers' TLS handshake 8 s.
 # - REALITY without its fallback rate limiter: it is built on github.com/juju/ratelimit (LGPL-3.0),
 #   and only a REALITY server uses it.
 #
