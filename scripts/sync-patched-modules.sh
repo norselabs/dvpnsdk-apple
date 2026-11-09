@@ -10,6 +10,10 @@
 # - Xray-core's REALITY client closing a connection whose server fails REALITY's verification
 #   (reality-no-spider.patch): it browsed the site that answered as a browser would, reading every
 #   page whole and keeping every link with no limit, and left the connection open.
+# - Xray-core's WebSocket and HTTPUpgrade dialers reading at most 64 KiB from the server until its
+#   handshake response ends, HTTPUpgrade within 8 s as WebSocket already did (unless it dials
+#   through another outbound, whose connection ignores read deadlines)
+#   (handshake-response-limit.patch): Go's HTTP parser keeps a header line whole however long it is.
 # - REALITY without its fallback rate limiter: it is built on github.com/juju/ratelimit (LGPL-3.0),
 #   and only a REALITY server uses it.
 #

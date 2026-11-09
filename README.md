@@ -216,7 +216,8 @@ a node sets.
   internet, reads no AmneziaWG key a node does not set, and drops format and control characters from server and city
   names; the tunnel layer refuses AmneziaWG values that could crash the engine or add settings, an Xray inbound with
   values Xray-core would refuse, and trusts an unpinned Hysteria node only through the system's roots. LibXray closes
-  a REALITY connection whose server fails verification instead of browsing the site that answered.
+  a REALITY connection whose server fails verification instead of browsing the site that answered, and reads at most
+  64 KiB of a WebSocket or HTTPUpgrade handshake response.
 - **Only `DVPNTunnel` imports `DVPNSDK`.** Everything an extension runs stays free of the backend client (lint enforces
   it).
 - **Mirrors.** When the API cannot be reached, requests go to mirrors: other hosts from the mirror lists, or the API

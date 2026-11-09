@@ -1,10 +1,11 @@
 #!/bin/sh
 # Checks the engines in Frameworks/ before they are used or released: each has the five slices, each slice holds
 # the engine it is named after, and none links code this package keeps out of them — GPL or LGPL libraries, and in
-# LibXray what GoBridge/xray-core removes; LibXray's timeout reader has GoBridge/xray-core's fix, WireGuardKitGo runs
-# on the patched Go runtime, and HevSocks5Tunnel never starts hev-task-system's stack-overflow detector. The build
-# scripts run it after a build, and scripts/check.sh and scripts/make-release-assets.sh before using what is there, so
-# an engine built from the unpatched sources is caught.
+# LibXray what GoBridge/xray-core removes; LibXray's timeout reader has GoBridge/xray-core's fix, and so has the
+# handshake response its WebSocket and HTTPUpgrade dialers read, WireGuardKitGo runs on the patched Go runtime, and
+# HevSocks5Tunnel never starts hev-task-system's stack-overflow detector. The build scripts run it after a build, and
+# scripts/check.sh and scripts/make-release-assets.sh before using what is there, so an engine built from the
+# unpatched sources is caught.
 #
 #   scripts/check-frameworks.sh [LibXray|LibHysteria|HevSocks5Tunnel|WireGuardKitGo]...   (default: all four)
 set -eu
@@ -89,6 +90,9 @@ verify() {
         [ "$engine" != LibXray ] || refuse "$binary" "$framework/$slice" "$FORBIDDEN_IN_XRAY"
         [ "$engine" != LibXray ] || has_timeout_reader_fix "$binary" ||
             die "$framework/$slice lacks GoBridge/xray-core's timeout reader fix: run scripts/$script"
+        # handshake-response-limit.patch's error, which upstream has no counterpart for.
+        [ "$engine" != LibXray ] || contains "$binary" 'server handshake response longer than 64 KiB' ||
+            die "$framework/$slice lacks GoBridge/xray-core's handshake response limit: run scripts/$script"
         # GoBridge/wireguard's runtime patch makes Go's clock count the time the device slept.
         [ "$engine" != WireGuardKitGo ] || contains "$binary" _mach_continuous_time ||
             die "$framework/$slice runs on a Go runtime without GoBridge/wireguard's patch: run scripts/$script"

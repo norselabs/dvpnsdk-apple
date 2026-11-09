@@ -37,6 +37,10 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 - An Xray node whose REALITY answer fails verification can no longer make LibXray download without end: the REALITY
   client closes the connection instead of browsing the site that answered, which read every page whole, kept every
   link it found and left the connection open.
+- An Xray or V2Ray node dialled over WebSocket or HTTPUpgrade can no longer fill memory with a handshake response that
+  never ends: LibXray's two dialers fail once the node has sent 64 KiB before the handshake ends, and HTTPUpgrade waits
+  at most 8 s for the response, as WebSocket did, unless it dials through another outbound (`dialerProxy`, as
+  ClientHello fragmentation does), whose connection ignores read deadlines.
 
 ### Changed
 

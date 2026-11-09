@@ -1,0 +1,105 @@
+--- a/transport/internet/handshake_limit.go
++++ b/transport/internet/handshake_limit.go
+@@ -0,0 +1,38 @@
++package internet
++
++import (
++	"net"
++
++	"github.com/xtls/xray-core/common/errors"
++)
++
++// MaxHandshakeResponse is how much a dialer reads from the server before its handshake response ends. Go's HTTP
++// response parser keeps a header line whole however long it is, so a server that never ends one would fill memory.
++const MaxHandshakeResponse = 64 * 1024
++
++// HandshakeLimitedConn fails its reads once MaxHandshakeResponse bytes have been read, until Unlimit.
++type HandshakeLimitedConn struct {
++	net.Conn
++	read      int
++	unlimited bool
++}
++
++func (c *HandshakeLimitedConn) Read(b []byte) (int, error) {
++	if c.unlimited {
++		return c.Conn.Read(b)
++	}
++	if c.read >= MaxHandshakeResponse {
++		return 0, errors.New("server handshake response longer than 64 KiB")
++	}
++	if len(b) > MaxHandshakeResponse-c.read {
++		b = b[:MaxHandshakeResponse-c.read]
++	}
++	n, err := c.Conn.Read(b)
++	c.read += n
++	return n, err
++}
++
++// Unlimit lifts the limit once the handshake is done.
++func (c *HandshakeLimitedConn) Unlimit() {
++	c.unlimited = true
++}
+--- a/transport/internet/httpupgrade/dialer.go
++++ b/transport/internet/httpupgrade/dialer.go
+@@ -8,6 +8,7 @@
+ 	"net/http"
+ 	"net/url"
+ 	"strings"
++	"time"
+ 
+ 	"github.com/xtls/xray-core/common"
+ 	"github.com/xtls/xray-core/common/errors"
+@@ -28,9 +29,12 @@
+ 	if c.First {
+ 		c.First = false
+ 		// create reader capped to size of `b`, so it can be fully drained into
+-		// `b` later with a single Read call
+-		reader := bufio.NewReaderSize(c.Conn, len(b))
++		// `b` later with a single Read call; the response must come within the
++		// WebSocket dialer's handshake timeout and internet.MaxHandshakeResponse
++		c.Conn.SetReadDeadline(time.Now().Add(time.Second * 8))
++		reader := bufio.NewReaderSize(&internet.HandshakeLimitedConn{Conn: c.Conn}, len(b))
+ 		resp, err := http.ReadResponse(reader, c.Req) // nolint:bodyclose
++		c.Conn.SetReadDeadline(time.Time{})
+ 		if err != nil {
+ 			return 0, err
+ 		}
+--- a/transport/internet/websocket/dialer.go
++++ b/transport/internet/websocket/dialer.go
+@@ -46,6 +46,8 @@
+ func dialWebSocket(ctx context.Context, dest net.Destination, streamSettings *internet.MemoryStreamConfig, ed []byte) (net.Conn, error) {
+ 	wsSettings := streamSettings.ProtocolSettings.(*Config)
+ 
++	// What the server sends until the handshake ends, TLS included, is limited to internet.MaxHandshakeResponse.
++	var limited *internet.HandshakeLimitedConn
+ 	dialer := &websocket.Dialer{
+ 		NetDial: func(network, addr string) (net.Conn, error) {
+ 			var conn net.Conn
+@@ -58,7 +60,8 @@
+ 			if err != nil {
+ 				return nil, errors.New("failed to dial to dest").Base(err)
+ 			}
+-			return conn, err
++			limited = &internet.HandshakeLimitedConn{Conn: conn}
++			return limited, nil
+ 		},
+ 		ReadBufferSize:   4 * 1024,
+ 		WriteBufferSize:  4 * 1024,
+@@ -87,7 +90,8 @@
+ 				}
+ 
+ 				// TLS and apply the handshake
+-				cn := tls.UClient(pconn, tlsConfig, fingerprint).(*tls.UConn)
++				limited = &internet.HandshakeLimitedConn{Conn: pconn}
++				cn := tls.UClient(limited, tlsConfig, fingerprint).(*tls.UConn)
+ 				if err := cn.WebsocketHandshakeContext(ctx); err != nil {
+ 					errors.LogErrorInner(ctx, err, "failed to dial to "+addr)
+ 					return nil, err
+@@ -153,6 +157,7 @@
+ 		}
+ 		return nil, errors.New("failed to dial to (", uri, "): ", reason).Base(err)
+ 	}
++	limited.Unlimit()
+ 
+ 	return NewConnection(conn, conn.RemoteAddr(), nil, wsSettings.HeartbeatPeriod), nil
+ }
