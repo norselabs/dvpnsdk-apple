@@ -1,0 +1,185 @@
+--- a/transport/internet/handshake_limit.go
++++ b/transport/internet/handshake_limit.go
+@@ -0,0 +1,38 @@
++package internet
++
++import (
++	"net"
++
++	"github.com/xtls/xray-core/common/errors"
++)
++
++// MaxHandshakeResponse is how much a dialer reads from the server before its handshake response ends. Go's HTTP
++// response parser keeps a header line whole however long it is, so a server that never ends one would fill memory.
++const MaxHandshakeResponse = 64 * 1024
++
++// HandshakeLimitedConn fails its reads once MaxHandshakeResponse bytes have been read, until Unlimit.
++type HandshakeLimitedConn struct {
++	net.Conn
++	read      int
++	unlimited bool
++}
++
++func (c *HandshakeLimitedConn) Read(b []byte) (int, error) {
++	if c.unlimited {
++		return c.Conn.Read(b)
++	}
++	if c.read >= MaxHandshakeResponse {
++		return 0, errors.New("server handshake response longer than 64 KiB")
++	}
++	if len(b) > MaxHandshakeResponse-c.read {
++		b = b[:MaxHandshakeResponse-c.read]
++	}
++	n, err := c.Conn.Read(b)
++	c.read += n
++	return n, err
++}
++
++// Unlimit lifts the limit once the handshake is done.
++func (c *HandshakeLimitedConn) Unlimit() {
++	c.unlimited = true
++}
+--- a/transport/internet/httpupgrade/dialer.go
++++ b/transport/internet/httpupgrade/dialer.go
+@@ -8,6 +8,7 @@
+ 	"net/http"
+ 	"net/url"
+ 	"strings"
++	"time"
+ 
+ 	"github.com/xtls/xray-core/common"
+ 	"github.com/xtls/xray-core/common/errors"
+@@ -22,15 +23,19 @@
+ 	net.Conn
+ 	Req   *http.Request
+ 	First bool
++	// what the server sent with the response, read before the connection
++	reader *bufio.Reader
+ }
+ 
+ func (c *ConnRF) Read(b []byte) (int, error) {
+ 	if c.First {
+ 		c.First = false
+-		// create reader capped to size of `b`, so it can be fully drained into
+-		// `b` later with a single Read call
+-		reader := bufio.NewReaderSize(c.Conn, len(b))
++		// the response must come within the WebSocket dialer's handshake timeout
++		// and internet.MaxHandshakeResponse
++		c.Conn.SetReadDeadline(time.Now().Add(time.Second * 8))
++		reader := bufio.NewReaderSize(&internet.HandshakeLimitedConn{Conn: c.Conn}, len(b))
+ 		resp, err := http.ReadResponse(reader, c.Req) // nolint:bodyclose
++		c.Conn.SetReadDeadline(time.Time{})
+ 		if err != nil {
+ 			return 0, err
+ 		}
+@@ -39,9 +44,19 @@
+ 			strings.ToLower(resp.Header.Get("Connection")) != "upgrade" {
+ 			return 0, errors.New("unrecognized reply")
+ 		}
+-		// drain remaining bufreader
+-		return reader.Read(b[:reader.Buffered()])
++		// what came with the response is read first, however short `b` is
++		if reader.Buffered() > 0 {
++			c.reader = reader
++		}
++		return c.Read(b)
+ 	}
++	if c.reader != nil {
++		n, err := c.reader.Read(b)
++		if c.reader.Buffered() == 0 {
++			c.reader = nil
++		}
++		return n, err
++	}
+ 	return c.Conn.Read(b)
+ }
+ 
+@@ -67,7 +82,12 @@
+ 		tlsConfig := tConfig.GetTLSConfig(tls.WithDestination(dest), tls.WithNextProto("http/1.1"))
+ 		if fingerprint := tls.GetFingerprint(tConfig.Fingerprint); fingerprint != nil {
+ 			conn = tls.UClient(pconn, tlsConfig, fingerprint)
+-			if err := conn.(*tls.UConn).WebsocketHandshakeContext(ctx); err != nil {
++			// the TLS handshake gets the same 8 s as the response
++			handshakeCtx, cancel := context.WithTimeout(ctx, time.Second*8)
++			err := conn.(*tls.UConn).WebsocketHandshakeContext(handshakeCtx)
++			cancel()
++			if err != nil {
++				pconn.Close()
+ 				return nil, err
+ 			}
+ 		} else {
+@@ -111,6 +131,7 @@
+ 
+ 	err = req.Write(conn)
+ 	if err != nil {
++		conn.Close()
+ 		return nil, err
+ 	}
+ 
+@@ -123,6 +144,7 @@
+ 	if transportConfiguration.Ed == 0 {
+ 		_, err = connRF.Read([]byte{})
+ 		if err != nil {
++			conn.Close()
+ 			return nil, err
+ 		}
+ 	}
+--- a/transport/internet/websocket/dialer.go
++++ b/transport/internet/websocket/dialer.go
+@@ -46,6 +46,8 @@
+ func dialWebSocket(ctx context.Context, dest net.Destination, streamSettings *internet.MemoryStreamConfig, ed []byte) (net.Conn, error) {
+ 	wsSettings := streamSettings.ProtocolSettings.(*Config)
+ 
++	// What the server sends until the handshake ends, TLS included, is limited to internet.MaxHandshakeResponse.
++	var limited *internet.HandshakeLimitedConn
+ 	dialer := &websocket.Dialer{
+ 		NetDial: func(network, addr string) (net.Conn, error) {
+ 			var conn net.Conn
+@@ -58,7 +60,8 @@
+ 			if err != nil {
+ 				return nil, errors.New("failed to dial to dest").Base(err)
+ 			}
+-			return conn, err
++			limited = &internet.HandshakeLimitedConn{Conn: conn}
++			return limited, nil
+ 		},
+ 		ReadBufferSize:   4 * 1024,
+ 		WriteBufferSize:  4 * 1024,
+@@ -73,7 +76,7 @@
+ 		tlsConfig := tConfig.GetTLSConfig(tls.WithDestination(dest), tls.WithNextProto("http/1.1"))
+ 		dialer.TLSClientConfig = tlsConfig
+ 		if fingerprint := tls.GetFingerprint(tConfig.Fingerprint); fingerprint != nil {
+-			dialer.NetDialTLSContext = func(_ context.Context, _, addr string) (net.Conn, error) {
++			dialer.NetDialTLSContext = func(dialCtx context.Context, _, addr string) (net.Conn, error) {
+ 				// Like the NetDial in the dialer
+ 				var pconn net.Conn
+ 				var err error
+@@ -87,14 +90,18 @@
+ 				}
+ 
+ 				// TLS and apply the handshake
+-				cn := tls.UClient(pconn, tlsConfig, fingerprint).(*tls.UConn)
+-				if err := cn.WebsocketHandshakeContext(ctx); err != nil {
++				limited = &internet.HandshakeLimitedConn{Conn: pconn}
++				cn := tls.UClient(limited, tlsConfig, fingerprint).(*tls.UConn)
++				// dialCtx carries the dialer's HandshakeTimeout
++				if err := cn.WebsocketHandshakeContext(dialCtx); err != nil {
+ 					errors.LogErrorInner(ctx, err, "failed to dial to "+addr)
++					cn.Close()
+ 					return nil, err
+ 				}
+ 				if !tlsConfig.InsecureSkipVerify {
+ 					if err := cn.VerifyHostname(tlsConfig.ServerName); err != nil {
+ 						errors.LogErrorInner(ctx, err, "failed to dial to "+addr)
++						cn.Close()
+ 						return nil, err
+ 					}
+ 				}
+@@ -153,6 +160,7 @@
+ 		}
+ 		return nil, errors.New("failed to dial to (", uri, "): ", reason).Base(err)
+ 	}
++	limited.Unlimit()
+ 
+ 	return NewConnection(conn, conn.RemoteAddr(), nil, wsSettings.HeartbeatPeriod), nil
+ }

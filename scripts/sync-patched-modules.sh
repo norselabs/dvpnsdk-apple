@@ -1,12 +1,22 @@
 #!/bin/sh
 # Generates the patched copies of Xray-core and REALITY that LibXray is built with, so it links no
-# GPL or LGPL code and no config loader it does not use, with one fix:
+# GPL or LGPL code and no config loader it does not use, with these fixes:
 #
 # - Xray-core without its YAML and TOML config loaders (main/yaml, main/toml): libXray passes JSON
 #   only, and the loaders link two YAML libraries and go-toml.
 # - Xray-core's TimeoutWrapperReader returning buf.ErrReadTimeout when its wait runs out, as the pipe
 #   reader does (timeout-reader-error.patch): its empty read with no error made the VMess outbound
 #   end the request of an app that sends nothing for about 0.3 s plus the time to reach the node.
+# - Xray-core's REALITY client closing a connection whose server fails REALITY's verification
+#   (reality-no-spider.patch): it browsed the site that answered as a browser would, reading every
+#   page whole and keeping every link with no limit, and left the connection open.
+# - Xray-core's WebSocket and HTTPUpgrade dialers reading at most 64 KiB from the server until its
+#   handshake response ends, HTTPUpgrade within 8 s as WebSocket already did (unless it dials
+#   through another outbound, whose connection ignores read deadlines)
+#   (handshake-response-limit.patch): Go's HTTP parser keeps a header line whole however long it is.
+#   The same patch keeps what an HTTPUpgrade server sends with its 101 for the first reads (upstream
+#   copied it into a buffer as short as the first read, an empty one on the dial, and panicked),
+#   closes a connection whose handshake fails, and gives both dialers' TLS handshake 8 s.
 # - REALITY without its fallback rate limiter: it is built on github.com/juju/ratelimit (LGPL-3.0),
 #   and only a REALITY server uses it.
 #

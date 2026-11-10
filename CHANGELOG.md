@@ -34,9 +34,22 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   307, 308) reads as `APIError.Reason.redirectionError`, which is transient.
 - The SNI mirror route checks every length its peer declares, in the certificate and in a chunked answer, against
   the bytes it sent, and reads at most 16 MiB of an answer: a malformed certificate or chunk size no longer traps.
+- An Xray node whose REALITY answer fails verification can no longer make LibXray download without end: the REALITY
+  client closes the connection instead of browsing the site that answered, which read every page whole, kept every
+  link it found and left the connection open.
+- An Xray or V2Ray node dialled over WebSocket or HTTPUpgrade can no longer fill memory with a handshake response that
+  never ends: LibXray's two dialers fail once the node has sent 64 KiB before the handshake ends, and HTTPUpgrade waits
+  at most 8 s for the response, as WebSocket did, unless it dials through another outbound (`dialerProxy`, as
+  ClientHello fragmentation does), whose connection ignores read deadlines.
+- An Xray or V2Ray node dialled over HTTPUpgrade can no longer crash the Xray extension by sending data in the same
+  packet as its upgrade response: LibXray reads those bytes first. Both dialers also close a connection whose
+  handshake fails, and give the TLS handshake 8 s, which had no limit.
 
 ### Changed
 
+- On iOS and tvOS an Xray, V2Ray or Hysteria tunnel keeps fewer than 100 connections open, TCP and UDP together: the
+  one that reaches 100 closes the one quiet the longest, which had stayed open until its idle timeout.
+  hev-socks5-tunnel carries its upstream fix that keeps a burst of new connections from passing the cap.
 - An AmneziaWG node sets `S1`–`S4`, `H1`–`H4` and `I1`–`I5` only: `ConnectionCredentials` reads no other key from
   the handshake's `awg` dictionary, and `TunnelManager.start(from:)` drops any other key of
   `AmneziaWGEndpoint.parameters`, credentials built by hand included. The junk packets (`Jc`, `Jmin`, `Jmax`) are the
