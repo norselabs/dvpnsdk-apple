@@ -47,8 +47,7 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 - Many connections at once no longer push the Xray extension past iOS's 50 MB memory limit, which restarted it and
   dropped the tunnel: on iOS and tvOS an Xray, V2Ray or Hysteria tunnel keeps fewer than 100 connections open, TCP and
   UDP together, and the one that reaches 100 ends the one idle longest. hev-socks5-tunnel carries its upstream fix that
-  keeps a burst of new connections from passing the cap. On iOS and tvOS a UDP flow quiet for 15 s ends, not after a
-  minute, so DNS lookups do not crowd out quiet TCP connections; one that sends again comes back from a new port.
+  keeps a burst of new connections from passing the cap.
 
 ### Changed
 

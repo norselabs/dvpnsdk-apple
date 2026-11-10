@@ -128,13 +128,6 @@ extension ProxyPacketTunnelProvider {
         onMacOS ? 0 : 100
     }
 
-    /// How long a UDP association carrying nothing either way lives, in milliseconds. Under a cap a quiet minute is
-    /// too long: each DNS lookup is a session of its own, and a burst of them would end the quiet TCP connections
-    /// first, so a capped tunnel lets them go after 15 s; one that is still sending comes back from a new port.
-    static func udpReadWriteTimeout(sessionCap: Int) -> Int {
-        sessionCap == 0 ? 60000 : 15000
-    }
-
     func startSocks5Tunnel(proxy: LocalProxy) throws {
         let config = Self.socks5TunnelConfiguration(mtu: mtu, proxy: proxy)
         let configurationFilePath = TunnelConfigDirectories.cachesDirectory
@@ -159,8 +152,7 @@ extension ProxyPacketTunnelProvider {
     /// hev-socks5-tunnel's YAML configuration.
     static func socks5TunnelConfiguration(mtu: Int, proxy: LocalProxy) -> String {
         // hev resets a TCP connection that carries nothing either way for 5 minutes, Xray's own idle limit, so a quiet
-        // session (SSH without keepalives, a long poll) outlasts a minute; a UDP association ends after a quiet minute,
-        // or 15 s under a session cap.
+        // session (SSH without keepalives, a long poll) outlasts a minute; a UDP association ends after a quiet minute.
         """
         tunnel:
           mtu: \(mtu)
@@ -174,7 +166,7 @@ extension ProxyPacketTunnelProvider {
           task-stack-size: 20480
           connect-timeout: 5000
           tcp-read-write-timeout: 300000
-          udp-read-write-timeout: \(udpReadWriteTimeout(sessionCap: maxSessionCount))
+          udp-read-write-timeout: 60000
           log-file: stderr
           log-level: error
           limit-nofile: 65535
