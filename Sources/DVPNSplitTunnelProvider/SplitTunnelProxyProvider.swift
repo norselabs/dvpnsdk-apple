@@ -19,9 +19,9 @@ import os
 /// The packet tunnel keeps carrying everything. The system offers this proxy every outbound TCP and UDP flow with
 /// its source app, except the system's DHCP and the local network's traffic (`SplitTunnelTraffic.excluded`). Flows
 /// that belong in the VPN are declined (`false`) and proceed untouched; the flows of the apps that bypass the VPN are
-/// copied through the proxy's own connections, bound to the physical interface, so they never enter the tunnel. DNS
-/// is not offered (port 53 can only be matched by domain), so bypassing apps still resolve names through the tunnel's
-/// resolver.
+/// copied through the proxy's own connections, bound to the physical interface, so they never enter the tunnel. The
+/// DNS providers' resolvers are not offered either: every app's lookups at one of them, a bypassing app's too, stay
+/// in the tunnel.
 ///
 /// The proxy runs while split tunnelling is on (the app starts it at launch and whenever it sees the tunnel connect,
 /// and it outlives the app), but it acts only while DVPN's tunnel is up, whoever started the tunnel: it offers itself

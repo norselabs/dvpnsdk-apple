@@ -3,6 +3,7 @@
 //  DVPNSDK
 //
 
+import DVPNCoreKit
 import Foundation
 import Network
 
@@ -34,8 +35,9 @@ public enum SplitTunnelTraffic {
     ]
 
     /// Left out of the proxy, whatever the app: the system's DHCP, whose renewals share one socket that a proxy
-    /// which stops or dies would take down with it, and traffic that stays on the local network or the
-    /// machine, which needs no split. Rules that name a wildcard address name a port.
+    /// which stops or dies would take down with it, traffic that stays on the local network or the
+    /// machine, which needs no split, and the DNS providers' resolvers (`dnsProviders`). Rules that name a wildcard
+    /// address name a port.
     public static let excluded: [Destination] = [
         // DHCP and DHCPv6.
         Destination("0.0.0.0", 0, port: 67, udpOnly: true),
@@ -54,12 +56,21 @@ public enum SplitTunnelTraffic {
         Destination("fe80::", 10),
         Destination("ff00::", 8),
         Destination("::1", 128),
-    ]
+    ] + dnsProviders
+
+    /// Every DNS provider's resolvers, on any port. Left out, every app's lookups at one of them stay in the tunnel,
+    /// and so does a bypassing app's own connection to one of these addresses.
+    static let dnsProviders: [Destination] = hosts(DNSServerType.allCases.flatMap(\.addresses))
 
     /// Left out while the tunnel is up: the tunnel's own traffic to its node. Offered to the proxy, a flow from the
     /// tunnel's extension is declined, and declining a UDP flow breaks its socket: Hysteria's QUIC could not connect.
     /// `addresses` are the node's addresses, IPv4 or IPv6; anything else is skipped.
     public static func excluded(node addresses: [String]) -> [Destination] {
+        hosts(addresses)
+    }
+
+    /// Each address as a destination of its own, on any port; what is neither an IPv4 nor an IPv6 address is skipped.
+    private static func hosts(_ addresses: [String]) -> [Destination] {
         addresses.compactMap { address in
             if IPv4Address(address) != nil { return Destination(address, 32) }
             if IPv6Address(address) != nil { return Destination(address, 128) }

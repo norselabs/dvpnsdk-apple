@@ -44,6 +44,10 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 - An Xray or V2Ray node dialled over HTTPUpgrade can no longer crash the Xray extension by sending data in the same
   packet as its upgrade response: LibXray reads those bytes first. Both dialers also close a connection whose
   handshake fails, and give the TLS handshake 8 s, which had no limit.
+- macOS split tunnelling keeps every app's lookups at a `DNSServerType` provider in the tunnel: the resolvers of every
+  provider are never offered to `SplitTunnelProxyProvider`, which had relayed the system resolver's connections to
+  them outside the tunnel, from the Mac's own address. A bypassing app's own connection to one of those addresses
+  stays in the VPN too.
 
 ### Changed
 

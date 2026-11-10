@@ -179,6 +179,7 @@ start from new credentials then.
 
 Add a transparent-proxy extension that subclasses `SplitTunnelProxyProvider`, name it in
 `DVPNCoreConfiguration(splitTunnelProviderBundleID:)`, and apply the user's choice with `SplitTunnelManager`.
+Lookups at a `DNSServerType` provider stay in the tunnel for every app: its resolvers are never offered to the proxy.
 
 ## The tunnels with your own API client
 
