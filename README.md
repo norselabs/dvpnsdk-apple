@@ -232,7 +232,9 @@ a node sets.
   node without IPv6.
 - **On iOS and tvOS the proxy tunnels keep fewer than 100 connections open.** The Xray and Hysteria tunnels end the
   connection idle longest when one reaches 100, so many connections at once cannot grow the extension past iOS's
-  memory limit; macOS has no such limit and no cap. A UDP flow that is still sending comes back as a new connection, so
+  memory limit; macOS has no such limit and no cap. The connection quiet the longest goes first, so under several
+  heavy pages at once a TCP connection quiet for minutes, such as a chat app's, can be reset, where without the cap the
+  extension restarted and every connection dropped. A UDP flow that is still sending comes back as a new connection, so
   more than 100 busy UDP flows open new connections to the node every few seconds.
 - **No GPL code in the engines.** LibXray is built on REALITY without its fallback rate limiter, whose dependency,
   `juju/ratelimit`, is LGPL-3.0 (`GoBridge/`); `GoBridge/nogpl` checks the licence of every linked Go module, and each
