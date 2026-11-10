@@ -41,8 +41,28 @@ struct PacketTunnelSettingsGeneratorTests {
         #expect(dns.matchDomains == [""])
     }
 
-    /// A generator with the provider's DNS settings, for a node at an IPv4 and an IPv6 address.
-    private func generator(dns: String) throws -> PacketTunnelSettingsGenerator {
+    /// A node's address gets no route outside the tunnel, in either family.
+    @Test
+    func aNodesAddressGetsNoRouteOutsideTheTunnel() throws {
+        let settings = try generator(dns: "1.1.1.1").generateNetworkSettings()
+
+        #expect(settings.ipv4Settings?.excludedRoutes?.map(\.destinationAddress) == [])
+        #expect(settings.ipv6Settings?.excludedRoutes?.map(\.destinationAddress) == [])
+    }
+
+    /// The ranges a peer's configuration excludes still leave the tunnel.
+    @Test
+    func aPeersExcludedRangesStayOutsideTheTunnel() throws {
+        let ranges = try [#require(IPAddressRange(from: "192.0.2.0/24")), #require(IPAddressRange(from: "2001:db8:1::/48"))]
+        let settings = try generator(dns: "1.1.1.1", excluding: ranges).generateNetworkSettings()
+
+        #expect(settings.ipv4Settings?.excludedRoutes?.map(\.destinationAddress) == ["192.0.2.0"])
+        #expect(settings.ipv6Settings?.excludedRoutes?.map(\.destinationAddress) == ["2001:db8:1::"])
+    }
+
+    /// A generator with the provider's DNS settings, for a node at an IPv4 and an IPv6 address;
+    /// `excluded` are its first peer's excluded ranges.
+    private func generator(dns: String, excluding excluded: [IPAddressRange] = []) throws -> PacketTunnelSettingsGenerator {
         let configuration = try TunnelConfiguration(
             fromWgQuickConfig: """
             [Interface]
@@ -62,6 +82,7 @@ struct PacketTunnelSettingsGeneratorTests {
             """,
             called: "WireGuard"
         )
+        configuration.peers[0].excludeIPs = excluded
         return PacketTunnelSettingsGenerator(
             tunnelConfiguration: configuration,
             resolvedEndpoints: configuration.peers.map(\.endpoint),

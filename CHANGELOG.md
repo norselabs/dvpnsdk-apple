@@ -44,6 +44,11 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 - An Xray or V2Ray node dialled over HTTPUpgrade can no longer crash the Xray extension by sending data in the same
   packet as its upgrade response: LibXray reads those bytes first. Both dialers also close a connection whose
   handshake fails, and give the TLS handshake 8 s, which had no limit.
+- A WireGuard or AmneziaWG tunnel no longer keeps its node's address outside the tunnel. WireGuardKit's adapter
+  excluded every peer's endpoint from the tunnel's routes, so any app's connection to that address left on the
+  physical interface, from the device's own address: a node that answered a lookup with its own address took that
+  connection out of the tunnel. A peer's `excludeIPs`, which only a configuration built in code carries, are still
+  excluded.
 - macOS split tunnelling keeps every app's lookups at a `DNSServerType` provider in the tunnel: the resolvers of every
   provider are never offered to `SplitTunnelProxyProvider`, which had relayed the system resolver's connections to
   them outside the tunnel, from the Mac's own address. A bypassing app's own connection to one of those addresses

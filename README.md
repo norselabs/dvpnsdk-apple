@@ -234,6 +234,9 @@ a node sets.
   sends DNS queries of its own on port 53 instead of asking the system (`dig`, a resolver library of its own) is not
   covered: its queries are ordinary traffic in the tunnel. A WireGuard configuration of your own whose DNS servers
   are not one `DNSServerType`'s keeps plain DNS. Each start logs which of the two it set.
+- **A WireGuard node's address stays in the tunnel.** WireGuardKit's adapter excludes no peer's endpoint from the
+  tunnel's routes, so an app's connection to the node's own address goes through the tunnel like any other. A
+  peer's `excludeIPs` are still excluded.
 - **Backend nodes carry no certificate.** At each start the Xray extension handshakes with the node once and pins the
   certificate it presented, or uses plaintext when no TLS handshake completes.
 - **The proxy tunnels leave IPv6 out, on purpose.** The Xray and Hysteria tunnels claim the IPv4 default route and no

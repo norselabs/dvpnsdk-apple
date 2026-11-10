@@ -263,18 +263,9 @@ class PacketTunnelSettingsGenerator {
     private func excludedRoutes() -> ([NEIPv4Route], [NEIPv6Route]) {
         var ipv4ExcludedRoutes = [NEIPv4Route]()
         var ipv6ExcludedRoutes = [NEIPv6Route]()
-        for endpoint in resolvedEndpoints {
-            guard let endpoint = endpoint else { continue }
-            switch endpoint.host {
-            case .ipv4(let address):
-                ipv4ExcludedRoutes.append(NEIPv4Route(destinationAddress: "\(address)", subnetMask: "255.255.255.255"))
-            case .ipv6(let address):
-                ipv6ExcludedRoutes.append(NEIPv6Route(destinationAddress: "\(address)", networkPrefixLength: NSNumber(value: UInt8(128))))
-            default:
-                // Only resolved IP endpoints can be excluded; never crash the extension over a hostname.
-                continue
-            }
-        }
+        // DVPN SDK: upstream also excludes every resolved endpoint here, as a host route outside the tunnel. This
+        // build excludes none: an app's connection to a peer's address goes through the tunnel like any other. Do
+        // not bring the loop back with an upstream diff.
 
         for peer in tunnelConfiguration.peers {
             for addressRange in peer.excludeIPs {
