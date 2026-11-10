@@ -8,8 +8,7 @@ import DVPNCoreKit
 import Foundation
 import Testing
 
-/// hev-socks5-tunnel's configuration caps its sessions on iOS and tvOS, so many sessions at once cannot grow the
-/// extension past iOS's memory limit; macOS, which has no such limit, gets none.
+/// hev-socks5-tunnel's configuration caps its sessions on iOS and tvOS, and not on macOS.
 struct Socks5TunnelConfigurationTests {
     @Test
     func theMiscBlockCarriesTheSessionCap() throws {

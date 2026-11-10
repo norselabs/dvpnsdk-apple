@@ -122,8 +122,7 @@ extension ProxyPacketTunnelProvider {
 #endif
 
     /// hev-socks5-tunnel's session cap, TCP and UDP together, 0 for none: the session that reaches it ends the least
-    /// recently active one, so fewer stay open. Each session costs the Xray extension 100–150 KB, mostly in Xray, and iOS
-    /// ends an extension at 50 MB; tvOS's engines are built as iOS's. macOS sets no such limit.
+    /// recently active one. iOS and tvOS cap at 100; macOS has no cap.
     static func sessionCap(onMacOS: Bool) -> Int {
         onMacOS ? 0 : 100
     }

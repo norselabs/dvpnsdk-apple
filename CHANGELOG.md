@@ -44,13 +44,12 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 - An Xray or V2Ray node dialled over HTTPUpgrade can no longer crash the Xray extension by sending data in the same
   packet as its upgrade response: LibXray reads those bytes first. Both dialers also close a connection whose
   handshake fails, and give the TLS handshake 8 s, which had no limit.
-- Many connections at once no longer push the Xray extension past iOS's 50 MB memory limit, which restarted it and
-  dropped the tunnel: on iOS and tvOS an Xray, V2Ray or Hysteria tunnel keeps fewer than 100 connections open, TCP and
-  UDP together, and the one that reaches 100 ends the one idle longest. hev-socks5-tunnel carries its upstream fix that
-  keeps a burst of new connections from passing the cap.
 
 ### Changed
 
+- On iOS and tvOS an Xray, V2Ray or Hysteria tunnel keeps fewer than 100 connections open, TCP and UDP together: the
+  one that reaches 100 closes the one quiet the longest, which had stayed open until its idle timeout.
+  hev-socks5-tunnel carries its upstream fix that keeps a burst of new connections from passing the cap.
 - An AmneziaWG node sets `S1`–`S4`, `H1`–`H4` and `I1`–`I5` only: `ConnectionCredentials` reads no other key from
   the handshake's `awg` dictionary, and `TunnelManager.start(from:)` drops any other key of
   `AmneziaWGEndpoint.parameters`, credentials built by hand included. The junk packets (`Jc`, `Jmin`, `Jmax`) are the
