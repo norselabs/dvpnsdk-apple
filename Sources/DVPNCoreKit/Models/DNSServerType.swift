@@ -27,8 +27,29 @@ public enum DNSServerType: String, CaseIterable, Sendable {
         address.splitToArray(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
     }
 
+    /// Where the provider answers DNS over HTTPS: a URL at its first resolver's address, with no host name.
+    package var dnsOverHTTPSURL: String {
+        switch self {
+        case .cloudflare:
+            return "https://1.1.1.1/dns-query"
+        case .google:
+            return "https://8.8.8.8/dns-query"
+        case .quad9:
+            return "https://9.9.9.9/dns-query"
+        }
+    }
+
     public static var `default`: DNSServerType {
         .cloudflare
+    }
+
+    /// The provider `servers` belong to: each of them is one of its resolvers. Nil for no server, and for servers that
+    /// are not one provider's, as a configuration of an app's own making can name.
+    package init?(servers: [String]) {
+        guard !servers.isEmpty, let provider = Self.allCases.first(where: { servers.allSatisfy($0.addresses.contains) }) else {
+            return nil
+        }
+        self = provider
     }
 }
 

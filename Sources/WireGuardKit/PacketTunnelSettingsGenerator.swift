@@ -16,9 +16,13 @@ class PacketTunnelSettingsGenerator {
     let tunnelConfiguration: TunnelConfiguration
     let resolvedEndpoints: [Endpoint?]
 
-    init(tunnelConfiguration: TunnelConfiguration, resolvedEndpoints: [Endpoint?]) {
+    /// DVPN SDK: the adapter's `dnsSettings`, see `WireGuardAdapter.init`. Not upstream's.
+    let dnsSettings: (@Sendable ([String]) -> NEDNSSettings?)?
+
+    init(tunnelConfiguration: TunnelConfiguration, resolvedEndpoints: [Endpoint?], dnsSettings: (@Sendable ([String]) -> NEDNSSettings?)?) {
         self.tunnelConfiguration = tunnelConfiguration
         self.resolvedEndpoints = resolvedEndpoints
+        self.dnsSettings = dnsSettings
     }
 
     func endpointUapiConfiguration() -> (String, [EndpointResolutionResult?]) {
@@ -163,7 +167,9 @@ class PacketTunnelSettingsGenerator {
 
         if !tunnelConfiguration.interface.dnsSearch.isEmpty || !tunnelConfiguration.interface.dns.isEmpty {
             let dnsServerStrings = tunnelConfiguration.interface.dns.map { $0.stringRepresentation }
-            let dnsSettings = NEDNSSettings(servers: dnsServerStrings)
+            // DVPN SDK: the adapter's owner may hand in other settings for these servers (DNS over HTTPS); upstream
+            // always builds plain DNS.
+            let dnsSettings = self.dnsSettings?(dnsServerStrings) ?? NEDNSSettings(servers: dnsServerStrings)
             dnsSettings.searchDomains = tunnelConfiguration.interface.dnsSearch
             if !tunnelConfiguration.interface.dns.isEmpty {
                 dnsSettings.matchDomains = [""] // All DNS queries must first go through the tunnel's DNS

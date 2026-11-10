@@ -54,6 +54,17 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 - On iOS and tvOS an Xray, V2Ray or Hysteria tunnel keeps fewer than 100 connections open, TCP and UDP together: the
   one that reaches 100 closes the one quiet the longest, which had stayed open until its idle timeout.
   hev-socks5-tunnel carries its upstream fix that keeps a burst of new connections from passing the cap.
+- Every tunnel's lookups through the system's resolver go over HTTPS (DNS over HTTPS) to the chosen
+  `DNSServerType`, inside the tunnel, so a node can no longer read or answer them. The packet tunnel providers set
+  `NEDNSOverHTTPSSettings` with the provider's endpoint, named by its resolver's address
+  (`https://1.1.1.1/dns-query`), its resolvers' addresses and every domain matched, for the
+  resolvers the app stored (`TunnelManager.start(from:)`, `restart()`, and a system start from an earlier version's
+  configuration), and log which settings a start got. The system's resolver never falls back to plain DNS: where
+  the provider's HTTPS endpoint cannot be reached, names do not resolve. A program's own queries on port 53 are
+  unchanged: they travel through the tunnel as plain DNS. A WireGuard configuration whose DNS servers are not one
+  provider's keeps plain DNS.
+- `WireGuardAdapter.init(with:dnsSettings:logHandler:)` takes the tunnel's DNS settings from its owner
+  (`dnsSettings`, nil by default), which is how `WireGuardPacketTunnelProvider` sets DNS over HTTPS.
 - An AmneziaWG node sets `S1`–`S4`, `H1`–`H4` and `I1`–`I5` only: `ConnectionCredentials` reads no other key from
   the handshake's `awg` dictionary, and `TunnelManager.start(from:)` drops any other key of
   `AmneziaWGEndpoint.parameters`, credentials built by hand included. The junk packets (`Jc`, `Jmin`, `Jmax`) are the

@@ -169,7 +169,8 @@ try await tunnels.start(from: credentials)
 > credential calls: the Xray extension serves `.xray` and `.v2ray`, the WireGuard extension `.wireguard` and
 > `.amneziawg`, the Hysteria extension `.hysteria`.
 
-`settings` supplies the DNS servers and whether Xray fragments its TLS ClientHello.
+`settings` supplies the DNS provider and whether Xray fragments its TLS ClientHello. Every tunnel looks names up
+with that provider over HTTPS ([How it is built](#how-it-is-built)).
 `TunnelManager` reads both when a tunnel starts. To apply a change to either, call `restart()`: it starts the tunnel
 again on the same node from the configuration the last start stored, with no new credentials. It throws
 `TunnelsServiceError.noStoredConfiguration`, leaving the tunnel as it is, when nothing is stored (tvOS may purge it);
@@ -225,6 +226,14 @@ a node sets.
   behind a different TLS server name (SNI). An SNI mirror's certificate is trusted only when a configured root key
   signed it. No request follows a redirect, and the SNI route checks every length its peer declares and reads at
   most 16 MiB of an answer.
+- **DNS over HTTPS, with no fallback.** Every tunnel hands the system the chosen provider's DNS over HTTPS endpoint,
+  a URL at its resolver's address with no host name (`https://1.1.1.1/dns-query`), together with its resolvers'
+  addresses (`NEDNSOverHTTPSSettings`, every domain matched): the lookups the system's resolver makes for the
+  device's apps travel encrypted inside the tunnel, and the node can neither read nor answer them. The system's
+  resolver never falls back to plain DNS: where the provider cannot be reached, names do not resolve. A program that
+  sends DNS queries of its own on port 53 instead of asking the system (`dig`, a resolver library of its own) is not
+  covered: its queries are ordinary traffic in the tunnel. A WireGuard configuration of your own whose DNS servers
+  are not one `DNSServerType`'s keeps plain DNS. Each start logs which of the two it set.
 - **Backend nodes carry no certificate.** At each start the Xray extension handshakes with the node once and pins the
   certificate it presented, or uses plaintext when no TLS handshake completes.
 - **The proxy tunnels leave IPv6 out, on purpose.** The Xray and Hysteria tunnels claim the IPv4 default route and no
@@ -294,7 +303,10 @@ zips the four frameworks and writes their checksums and `binaryRelease` into `Pa
 - `scripts/check.sh [--fix] [--platforms]` before pushing: formatting and lint with the SwiftFormat and SwiftLint
   versions it pins, the Go checks, the engines' licence check, the tests, and with `--platforms` an `xcodebuild` of every
   target for iOS Simulator, macOS and tvOS Simulator.
-- `scripts/test.sh` runs the tests alone. They need no network or device.
+- `scripts/test.sh` runs the tests alone. They need no network or device. They need SwiftPM's Swift Build engine
+  (the default from Xcode 27.1), which makes each test target a bundle and a process of its own:
+  `DVPNXRayProviderTests` and `DVPNWireGuardProviderTests` each link their engine's Go runtime, and one binary can
+  hold only one. Neither starts it.
 
 ## Licences
 
