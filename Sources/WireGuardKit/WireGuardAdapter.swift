@@ -81,6 +81,9 @@ public class WireGuardAdapter {
     /// Log handler closure.
     private let logHandler: LogHandler
 
+    /// DVPN SDK: see `init`. Not upstream's.
+    private let dnsSettings: (@Sendable ([String]) -> NEDNSSettings?)?
+
     /// Private queue used to synchronize access to `WireGuardAdapter` members.
     private let workQueue = DispatchQueue(label: "WireGuardAdapterWorkQueue")
 
@@ -159,9 +162,14 @@ public class WireGuardAdapter {
     /// Designated initializer.
     /// - Parameter packetTunnelProvider: an instance of `NEPacketTunnelProvider`. Internally stored
     ///   as a weak reference.
+    /// - Parameter dnsSettings: DVPN SDK, not upstream's: the tunnel's DNS settings for the configuration's DNS
+    ///   servers, when they should be other than plain DNS (DNS over HTTPS). Nil, or a nil answer, keeps upstream's
+    ///   plain `NEDNSSettings`. The configuration's search domains and the match-all domain are set on either. It is
+    ///   called on the adapter's own queue.
     /// - Parameter logHandler: a log handler closure.
-    public init(with packetTunnelProvider: NEPacketTunnelProvider, logHandler: @escaping LogHandler) {
+    public init(with packetTunnelProvider: NEPacketTunnelProvider, dnsSettings: (@Sendable ([String]) -> NEDNSSettings?)? = nil, logHandler: @escaping LogHandler) {
         self.packetTunnelProvider = packetTunnelProvider
+        self.dnsSettings = dnsSettings
         self.logHandler = logHandler
 
         setupLogHandler()
@@ -435,7 +443,8 @@ public class WireGuardAdapter {
     private func makeSettingsGenerator(with tunnelConfiguration: TunnelConfiguration) throws -> PacketTunnelSettingsGenerator {
         return PacketTunnelSettingsGenerator(
             tunnelConfiguration: tunnelConfiguration,
-            resolvedEndpoints: try self.resolvePeers(for: tunnelConfiguration)
+            resolvedEndpoints: try self.resolvePeers(for: tunnelConfiguration),
+            dnsSettings: self.dnsSettings
         )
     }
 

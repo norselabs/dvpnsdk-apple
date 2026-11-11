@@ -44,12 +44,32 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 - An Xray or V2Ray node dialled over HTTPUpgrade can no longer crash the Xray extension by sending data in the same
   packet as its upgrade response: LibXray reads those bytes first. Both dialers also close a connection whose
   handshake fails, and give the TLS handshake 8 s, which had no limit.
+- A WireGuard or AmneziaWG tunnel no longer keeps its node's address outside the tunnel. WireGuardKit's adapter
+  excluded every peer's endpoint from the tunnel's routes, so any app's connection to that address left on the
+  physical interface, from the device's own address: a node that answered a lookup with its own address took that
+  connection out of the tunnel. A peer's `excludeIPs`, which only a configuration built in code carries, are still
+  excluded.
+- macOS split tunnelling keeps every app's lookups at a `DNSServerType` provider in the tunnel: the resolvers of every
+  provider are never offered to `SplitTunnelProxyProvider`, which had relayed the system resolver's connections to
+  them outside the tunnel, from the Mac's own address. A bypassing app's own connection to one of those addresses
+  stays in the VPN too.
 
 ### Changed
 
 - On iOS and tvOS an Xray, V2Ray or Hysteria tunnel keeps fewer than 100 connections open, TCP and UDP together: the
   one that reaches 100 closes the one quiet the longest, which had stayed open until its idle timeout.
   hev-socks5-tunnel carries its upstream fix that keeps a burst of new connections from passing the cap.
+- Every tunnel's lookups through the system's resolver go over HTTPS (DNS over HTTPS) to the chosen
+  `DNSServerType`, inside the tunnel, so a node can no longer read or answer them. The packet tunnel providers set
+  `NEDNSOverHTTPSSettings` with the provider's endpoint, named by its resolver's address
+  (`https://1.1.1.1/dns-query`), its resolvers' addresses and every domain matched, for the
+  resolvers the app stored (`TunnelManager.start(from:)`, `restart()`, and a system start from an earlier version's
+  configuration), and log which settings a start got. The system's resolver never falls back to plain DNS: where
+  the provider's HTTPS endpoint cannot be reached, names do not resolve. A program's own queries on port 53 are
+  unchanged: they travel through the tunnel as plain DNS. A WireGuard configuration whose DNS servers are not one
+  provider's keeps plain DNS.
+- `WireGuardAdapter.init(with:dnsSettings:logHandler:)` takes the tunnel's DNS settings from its owner
+  (`dnsSettings`, nil by default), which is how `WireGuardPacketTunnelProvider` sets DNS over HTTPS.
 - An AmneziaWG node sets `S1`–`S4`, `H1`–`H4` and `I1`–`I5` only: `ConnectionCredentials` reads no other key from
   the handshake's `awg` dictionary, and `TunnelManager.start(from:)` drops any other key of
   `AmneziaWGEndpoint.parameters`, credentials built by hand included. The junk packets (`Jc`, `Jmin`, `Jmax`) are the

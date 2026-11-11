@@ -161,8 +161,11 @@ let package = Package(
                 .linkedFramework("CoreFoundation"),
             ]
         ),
-        .testTarget(name: "DVPNProxyProviderCoreTests", dependencies: ["DVPNProxyProviderCore"]),
+        .testTarget(name: "DVPNProxyProviderCoreTests", dependencies: ["DVPNCoreKit", "DVPNProxyProviderCore"]),
         .testTarget(name: "WireGuardKitTests", dependencies: ["WireGuardKitTypes"], swiftSettings: [.swiftLanguageMode(.v5)]),
+        // Links the real WireGuardKitGo macOS slice, in a bundle of its own, so the settings WireGuardKit's adapter hands
+        // the system are built under `swift test`. Never starts the engine.
+        .testTarget(name: "DVPNWireGuardProviderTests", dependencies: ["DVPNCoreKit", "DVPNWireGuardProvider", "WireGuardKit"]),
     ],
     swiftLanguageModes: [.v6]
 )

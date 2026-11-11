@@ -3,6 +3,7 @@
 //  DVPNSDK
 //
 
+import DVPNCoreKit
 import DVPNSplitTunnelCore
 import Foundation
 import Testing
@@ -38,6 +39,16 @@ struct SplitTunnelTrafficTests {
         let excluded = SplitTunnelTraffic.excluded(node: ["203.0.113.7", "2001:db8::7", "node.example", ""])
         #expect(excluded.map { "\($0.address)/\($0.prefix)" } == ["203.0.113.7/32", "2001:db8::7/128"])
         #expect(excluded.allSatisfy { $0.port == nil && !$0.isUDPOnly })
+    }
+
+    /// The DNS providers' resolvers never reach the proxy, whatever the app, the port and the protocol.
+    @Test(arguments: DNSServerType.allCases)
+    func theDNSProvidersAreLeftOut(provider: DNSServerType) {
+        for address in provider.addresses {
+            #expect(SplitTunnelTraffic.excluded.contains {
+                $0.address == address && $0.prefix == 32 && $0.port == nil && !$0.isUDPOnly
+            })
+        }
     }
 
     @Test
