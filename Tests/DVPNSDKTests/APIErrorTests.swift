@@ -49,7 +49,8 @@ struct APIErrorTests {
         ("bannedDevice", 403, .deviceBanned),
         ("appInactive", 403, .appIsInactive),
         ("deviceNotEnrolled", 425, .deviceNotEnrolled),
-        ("serverInactive", 503, .temporaryUnavailable),
+        ("tooManyRequests", 429, .tooManyRequests),
+        ("serverInactive", 503, .serverUnavailable),
         ("unauthorizedAccount", 400, .invalidRequest),
         ("unauthorizedApplication", 400, .invalidRequest),
     ])
@@ -57,6 +58,12 @@ struct APIErrorTests {
         // Production leaves the reason empty.
         let body = Data(#"{"error":"\#(code)","reason":""}"#.utf8)
         #expect(APIError.answer(status: status, body: body).reason == expected)
+    }
+
+    /// Too many requests is known by its code only.
+    @Test
+    func a429WithoutItsCodeHasNoReason() {
+        #expect(APIError.backend(status: 429, code: nil).reason == nil)
     }
 
     /// The SDK follows no redirect, so every redirect status reaches the client as its answer.
@@ -129,6 +136,7 @@ struct APIErrorTests {
         APIError.backend(status: 400, code: "invalidRequest"),
         .backend(status: 401, code: "somethingElse"),
         .backend(status: 404, code: "notFound"),
+        .backend(status: 429, code: "tooManyRequests"),
         .backend(status: 500, code: "unknownError"),
         .invalidResponse(status: 200),
     ])
@@ -151,13 +159,14 @@ struct APIErrorTests {
         #expect(error.deviceState == expected)
     }
 
-    /// A code the SDK does not know describes something other than the device (another API's refusal, say): it must
-    /// not make the app drop the device's token.
+    /// Any other failure reveals no device state, so it never makes the app drop the device's token: a code the SDK
+    /// does not know (another API's refusal, say), or one it knows that is not about the device.
     @Test(arguments: [
         APIError.backend(status: 401, code: "somethingElse"),
         .backend(status: 403, code: "invalidRequest"),
         .backend(status: 400, code: nil),
         .backend(status: 404, code: "notFound"),
+        .backend(status: 429, code: "tooManyRequests"),
         .unreachable(.timedOut),
         .offline,
     ])

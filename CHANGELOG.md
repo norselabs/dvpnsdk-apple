@@ -9,6 +9,15 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 - `TunnelsServiceError.refusedNodeAddress`: `TunnelManager.start(from:)` refuses a node whose address
   `ConnectionCredentials` would not decode, so credentials built by hand get the same checks.
+- `APIError.Reason.tooManyRequests`: the backend's `tooManyRequests` code (429: too many registrations from one
+  address, or credentials requests from one device). It is not transient and reveals no device state; a 429 without
+  the code has no reason. A `switch` over `APIError.Reason` must handle the new case.
+
+### Changed
+
+- The backend's `serverInactive` code (503: the server takes no connections now) reads as
+  `APIError.Reason.serverUnavailable`, whose raw value is now `serverInactive`, instead of `temporaryUnavailable`.
+  Both reasons are transient.
 
 ### Fixed
 
