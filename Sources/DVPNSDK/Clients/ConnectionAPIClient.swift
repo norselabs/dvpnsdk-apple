@@ -12,8 +12,8 @@ import Foundation
 /// Each credentials request names the node types it is given, comma-joined in that order (a city's, a country's and the
 /// backend's own pick in the `filter` query, as the lists do; a server's in its body), and an empty list names none.
 /// With none, the backend picks a WireGuard or V2Ray node for a city, a country or its own pick, as for the apps that
-/// predate the other types. A server's request sends its list too, so an app that offers every node type sends
-/// them all there; with none, the backend could keep to WireGuard and V2Ray.
+/// predate the other types. The backend ignores a server's list: it opens the session on that server, whatever its
+/// node type.
 public struct ConnectionAPIClient: Sendable {
     /// Over a new connection, so a tunnel that just came up is the one that answers.
     public var publicIP: @Sendable () async throws -> IPResponse

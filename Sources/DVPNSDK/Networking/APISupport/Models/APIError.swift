@@ -55,7 +55,7 @@ public extension APIError {
         case .timedOut, .noConnection, .temporaryUnavailable, .serverUnavailable, .tlsError, .redirectionError:
             return true
         case .unknownError, .invalidRequest, .notFound, .unauthorizedDevice, .deviceBanned, .deviceNotEnrolled,
-             .appIsNotGenuine, .appIsInactive, nil:
+             .tooManyRequests, .appIsNotGenuine, .appIsInactive, nil:
             return false
         }
     }
@@ -106,8 +106,11 @@ public extension APIError {
         case unauthorizedDevice
         case deviceBanned = "bannedDevice"
         case deviceNotEnrolled
+        /// Too many registrations from one address, or credentials requests from one device; known by its code only.
+        case tooManyRequests
         case temporaryUnavailable
-        case serverUnavailable
+        /// The server asked for cannot take connections now (`serverInactive`, or a 410).
+        case serverUnavailable = "serverInactive"
         case appIsNotGenuine
         case appIsInactive = "appInactive"
     }

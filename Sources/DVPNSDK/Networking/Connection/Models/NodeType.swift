@@ -35,7 +35,8 @@ extension [NodeType] {
 
 /// The query of a quick, country or city credentials request: the node types it accepts (`filter`, comma-joined, as the
 /// lists send it); with none, no query, and the backend picks among WireGuard and V2Ray nodes only. The request still
-/// sends an empty JSON body (`EmptyJSONObject`): the backend refuses one without (400).
+/// sends an empty JSON body (`EmptyJSONObject`): a request with a body can go to a mirror while the primary is silent
+/// (`canBeHandedOver`).
 struct CredentialsFilter: Sendable {
     let nodeTypes: [NodeType]
 
@@ -53,8 +54,8 @@ struct EmptyJSONObject: Encodable, Sendable {}
 
 // MARK: - CredentialsBody
 
-/// The JSON body of a server's credentials request: the node types it accepts, comma-joined; with none, the key is left
-/// out.
+/// The JSON body of a server's credentials request: the node types the app accepts, comma-joined, which the backend
+/// ignores; with none, the key is left out. A request with a body can go to a mirror while the primary is silent.
 struct CredentialsBody: Sendable {
     let nodeTypes: [NodeType]
 
