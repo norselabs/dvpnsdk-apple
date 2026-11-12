@@ -27,16 +27,9 @@ public enum DNSServerType: String, CaseIterable, Sendable {
         address.splitToArray(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
     }
 
-    /// Where the provider answers DNS over HTTPS: a URL at its first resolver's address, with no host name.
-    package var dnsOverHTTPSURL: String {
-        switch self {
-        case .cloudflare:
-            return "https://1.1.1.1/dns-query"
-        case .google:
-            return "https://8.8.8.8/dns-query"
-        case .quad9:
-            return "https://9.9.9.9/dns-query"
-        }
+    /// Where the provider answers DNS over HTTPS at `address`, one of its `addresses`: a URL with no host name.
+    package func dnsOverHTTPSURL(at address: String) -> String {
+        "https://\(address)/dns-query"
     }
 
     public static var `default`: DNSServerType {

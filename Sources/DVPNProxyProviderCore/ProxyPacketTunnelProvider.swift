@@ -68,10 +68,11 @@ open class ProxyPacketTunnelProvider: NEPacketTunnelProvider {
         return settings
     }
 
-    /// The tunnel's resolvers: DNS over HTTPS to the provider `servers` belong to. Servers of no provider keep plain
-    /// DNS. A line in the log says which.
-    static func dnsSettings(servers: [String]) -> NEDNSSettings {
-        guard let settings = DNSServerType.dnsOverHTTPSSettings(servers: servers) else {
+    /// The tunnel's resolvers: DNS over HTTPS to the provider `servers` belong to, at one of its addresses
+    /// (`DNSServerType.dnsOverHTTPSSettings(servers:in:)`). Servers of no provider keep plain DNS. A line in the log
+    /// says which.
+    static func dnsSettings(servers: [String], in defaults: UserDefaults = .shared) -> NEDNSSettings {
+        guard let settings = DNSServerType.dnsOverHTTPSSettings(servers: servers, in: defaults) else {
             logger.notice("DNS: plain, the servers are of no provider")
             return NEDNSSettings(servers: servers)
         }

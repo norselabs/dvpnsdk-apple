@@ -227,8 +227,9 @@ a node sets.
   signed it. No request follows a redirect, and the SNI route checks every length its peer declares and reads at
   most 16 MiB of an answer.
 - **DNS over HTTPS, with no fallback.** Every tunnel hands the system the chosen provider's DNS over HTTPS endpoint,
-  a URL at its resolver's address with no host name (`https://1.1.1.1/dns-query`), together with its resolvers'
-  addresses (`NEDNSOverHTTPSSettings`, every domain matched): the lookups the system's resolver makes for the
+  a URL at one of its resolvers' addresses with no host name (`https://1.1.1.1/dns-query`), together with that
+  address (`NEDNSOverHTTPSSettings`, every domain matched), the provider's other address than the settings before
+  named: the lookups the system's resolver makes for the
   device's apps travel encrypted inside the tunnel, and the node can neither read nor answer them. The system's
   resolver never falls back to plain DNS: where the provider cannot be reached, names do not resolve. A program that
   sends DNS queries of its own on port 53 instead of asking the system (`dig`, a resolver library of its own) is not

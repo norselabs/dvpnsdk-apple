@@ -12,22 +12,44 @@ import Testing
 
 /// The network settings WireGuardKit's generator makes for a WireGuard or AmneziaWG tunnel, given the DNS settings
 /// `WireGuardPacketTunnelProvider` hands the adapter. The provider and its adapter cannot be made outside an
-/// extension, so no test reaches the two lines that hand them over.
+/// extension, so no test reaches the two lines that hand them over. The DNS settings keep their last address in one
+/// defaults suite, emptied before each test, which the tests share, so they run one after the other.
+@Suite(.serialized)
 struct PacketTunnelSettingsGeneratorTests {
-    /// The tunnel's lookups go to the chosen provider over HTTPS, at its own addresses, for every name, and never
-    /// fall back to plain DNS, which the node could read and answer.
+    /// One fixed suite, so a run leaves no new preferences file behind.
+    private static let suiteName = "com.example.vpn.tests.wireguard-dns-settings"
+
+    init() {
+        UserDefaults(suiteName: Self.suiteName)?.removePersistentDomain(forName: Self.suiteName)
+    }
+
+    /// The tunnel's lookups go to the chosen provider over HTTPS, at one of its own addresses, for every name, and
+    /// never fall back to plain DNS, which the node could read and answer.
     @Test(arguments: DNSServerType.allCases)
     func lookupsGoToTheProviderOverHTTPS(provider: DNSServerType) throws {
         let settings = try generator(dns: provider.address).generateNetworkSettings()
 
         let dns = try #require(settings.dnsSettings as? NEDNSOverHTTPSSettings)
         #expect(dns.dnsProtocol == .HTTPS)
-        #expect(dns.serverURL?.absoluteString == provider.dnsOverHTTPSURL)
-        #expect(dns.servers == provider.addresses)
+        #expect(dns.serverURL?.absoluteString == provider.dnsOverHTTPSURL(at: provider.addresses[0]))
+        #expect(dns.servers == [provider.addresses[0]])
         #expect(dns.matchDomains == [""])
         if #available(iOS 26.0, macOS 26.0, tvOS 26.0, *) {
             #expect(!dns.allowFailover)
         }
+    }
+
+    /// Each time the adapter makes the settings, they name the provider's other address than the time before.
+    @Test
+    func eachSettingsNameTheOtherAddress() throws {
+        let generator = try generator(dns: DNSServerType.google.address)
+
+        let hosts = try (0 ..< 3).map { _ in
+            let dns = try #require(generator.generateNetworkSettings().dnsSettings as? NEDNSOverHTTPSSettings)
+            return try #require(dns.serverURL?.host())
+        }
+
+        #expect(hosts == ["8.8.8.8", "8.8.4.4", "8.8.8.8"])
     }
 
     /// Resolvers of no provider, as a configuration of an app's own making can name, stay plain DNS.
@@ -86,7 +108,9 @@ struct PacketTunnelSettingsGeneratorTests {
         return PacketTunnelSettingsGenerator(
             tunnelConfiguration: configuration,
             resolvedEndpoints: configuration.peers.map(\.endpoint),
-            dnsSettings: WireGuardPacketTunnelProvider.dnsSettings
+            dnsSettings: { servers in
+                WireGuardPacketTunnelProvider.dnsSettings(servers: servers, in: UserDefaults(suiteName: Self.suiteName) ?? .standard)
+            }
         )
     }
 }

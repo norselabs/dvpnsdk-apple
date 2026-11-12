@@ -14,14 +14,19 @@ import WireGuardKit
 /// The extension target only subclasses it:
 /// `final class PacketTunnelProvider: WireGuardPacketTunnelProvider {}`
 open class WireGuardPacketTunnelProvider: NEPacketTunnelProvider {
-    private lazy var adapter: WireGuardAdapter = .init(with: self, dnsSettings: Self.dnsSettings) { [weak self] logLevel, message in
-        self?.adapterLog(level: logLevel, message: message)
-    }
+    private lazy var adapter: WireGuardAdapter = .init(
+        with: self,
+        dnsSettings: { Self.dnsSettings(servers: $0) },
+        logHandler: { [weak self] logLevel, message in
+            self?.adapterLog(level: logLevel, message: message)
+        }
+    )
 
     /// The tunnel's resolvers, for the adapter: DNS over HTTPS to the provider the configuration's DNS servers belong
-    /// to. Nil for servers of no provider, which the adapter keeps as plain DNS. A line in the log says which.
-    static func dnsSettings(servers: [String]) -> NEDNSSettings? {
-        guard let settings = DNSServerType.dnsOverHTTPSSettings(servers: servers) else {
+    /// to, at one of its addresses (`DNSServerType.dnsOverHTTPSSettings(servers:in:)`). Nil for servers of no
+    /// provider, which the adapter keeps as plain DNS. A line in the log says which.
+    static func dnsSettings(servers: [String], in defaults: UserDefaults = .shared) -> NEDNSSettings? {
+        guard let settings = DNSServerType.dnsOverHTTPSSettings(servers: servers, in: defaults) else {
             logger.notice("DNS: plain, the servers are of no provider")
             return nil
         }
