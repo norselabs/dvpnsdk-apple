@@ -70,8 +70,11 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   hev-socks5-tunnel carries its upstream fix that keeps a burst of new connections from passing the cap.
 - Every tunnel's lookups through the system's resolver go over HTTPS (DNS over HTTPS) to the chosen
   `DNSServerType`, inside the tunnel, so a node can no longer read or answer them. The packet tunnel providers set
-  `NEDNSOverHTTPSSettings` with the provider's endpoint, named by its resolver's address
-  (`https://1.1.1.1/dns-query`), its resolvers' addresses and every domain matched, for the
+  `NEDNSOverHTTPSSettings` with the provider's endpoint, named by one of its resolvers' addresses
+  (`https://1.1.1.1/dns-query`), that address as the only server and every domain matched. Each time the settings are
+  made they name the provider's other address than the time before (`https://1.0.0.1/dns-query` after
+  `https://1.1.1.1/dns-query`, kept in App Group defaults; its first address after another provider's), so no two
+  settings in a row share an endpoint host, and settings two apart name the same one. They are made for the
   resolvers the app stored (`TunnelManager.start(from:)`, `restart()`, and a system start from an earlier version's
   configuration), and log which settings a start got. The system's resolver never falls back to plain DNS: where
   the provider's HTTPS endpoint cannot be reached, names do not resolve. A program's own queries on port 53 are
