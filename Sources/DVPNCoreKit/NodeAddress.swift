@@ -49,9 +49,25 @@ package enum NodeAddress {
         resolve: @Sendable (String) -> [String] = NodeAddress.resolve
     ) async throws {
         guard case let .refused(address) = await check(host, resolve: resolve) else { return }
-        throw NSError.newError(
-            "Refused the node \(host.escapingControlCharacters): it resolves to \(address), not a public address"
-        )
+        throw refusal(of: host, at: address)
+    }
+
+    /// The node as a proxy engine's start records it in `TunnelStateStore`: a name's public addresses, comma-separated,
+    /// in the resolver's order; the host itself when it is an address, or a name that resolves to nothing. Throws as
+    /// `refuseNonPublic(_:resolve:)` does.
+    package static func recordedNode(
+        _ host: String,
+        resolve: @Sendable (String) -> [String] = NodeAddress.resolve
+    ) async throws -> String {
+        switch await check(host, resolve: resolve) {
+        case let .refused(address): throw refusal(of: host, at: address)
+        case let .addresses(addresses): addresses.joined(separator: ",")
+        case .unresolved: host
+        }
+    }
+
+    private static func refusal(of host: String, at address: String) -> NSError {
+        NSError.newError("Refused the node \(host.escapingControlCharacters): it resolves to \(address), not a public address")
     }
 
     /// `host`'s addresses through the system's resolver, numeric, each once, in the resolver's order; empty when it

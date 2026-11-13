@@ -21,7 +21,8 @@ package enum TunnelStateStore {
         "\(TunnelEnvironment.appGroupID).tunnel-state"
     }
 
-    /// The node the tunnel connects to: an address or a host name, or nil when it is down or did not say.
+    /// The node the tunnel connects to, or nil when it is down or did not say: a proxy engine's recorded addresses
+    /// (a name's, comma-separated), or the host as written (an address, or WireGuard's host name).
     package static let serverKey = "TUNNEL_SERVER"
 
     /// `server` is the node the tunnel connects to, kept while it is up so the split-tunnel proxy is never offered

@@ -76,7 +76,9 @@ open class WireGuardPacketTunnelProvider: NEPacketTunnelProvider {
             throw error
         }
         // On every platform, for `TunnelManager.connectedNode()`. Before the tunnel's interface appears, so the macOS
-        // split-tunnel proxy sees both together; the node it connects to is left out of the proxy.
+        // split-tunnel proxy sees both together; the node it connects to is left out of the proxy. The host is recorded
+        // as written, a name included, unlike the proxy engines' resolved addresses: WireGuardKit resolves the endpoint
+        // itself and does not expose the address it dials, so the split-tunnel proxy looks a name up again.
         TunnelStateStore.record(isUp: true, server: host)
         do {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in

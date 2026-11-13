@@ -92,6 +92,31 @@ struct NodeAddressTests {
         }
     }
 
+    // MARK: What a proxy engine records
+
+    /// A proxy engine records a name as every address it resolved to, so the split-tunnel proxy leaves out whichever of
+    /// them the engine dials, with no lookup of its own.
+    @Test
+    func aProxyRecordsANamesAddresses() async throws {
+        let recorded = try await NodeAddress.recordedNode("node.example.com") { _ in ["203.0.113.10", "2001:db8::10"] }
+
+        #expect(recorded == "203.0.113.10,2001:db8::10")
+    }
+
+    /// An address is recorded as it is; a name that resolves to nothing is recorded as the name.
+    @Test
+    func anAddressOrAnUnresolvedNameIsRecordedAsWritten() async throws {
+        #expect(try await NodeAddress.recordedNode("203.0.113.10") { _ in [] } == "203.0.113.10")
+        #expect(try await NodeAddress.recordedNode("node.example.com") { _ in [] } == "node.example.com")
+    }
+
+    @Test
+    func aNonPublicNodeIsNotRecorded() async {
+        await #expect(throws: (any Error).self) {
+            _ = try await NodeAddress.recordedNode("node.example.com") { _ in ["192.168.1.20"] }
+        }
+    }
+
     // MARK: The ranges
 
     /// The tunnel layer's ranges and the decoder's are the same, address by address. The decoder's live in DVPNSDK,

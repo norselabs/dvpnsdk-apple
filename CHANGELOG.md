@@ -21,6 +21,10 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ### Changed
 
+- An Xray or Hysteria tunnel records its node in `TunnelStateStore` as the addresses its host name resolved to,
+  comma-separated, so `TunnelManager.connectedNode()` returns that list and the macOS split-tunnel proxy leaves those
+  addresses out with no lookup of its own. A WireGuard tunnel still records its host as written: WireGuardKit does
+  not expose the address it dials, so the proxy still looks a name up.
 - A proxy tunnel's DNS settings are set after `ProxyPacketTunnelProvider.makeNetworkSettings(network:)` returns,
   over whatever it set: a subclass that builds its own settings gets the provider's DNS over HTTPS without setting
   it, and DNS it sets itself is replaced.

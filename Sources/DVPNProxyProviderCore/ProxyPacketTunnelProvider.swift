@@ -100,10 +100,12 @@ open class ProxyPacketTunnelProvider: NEPacketTunnelProvider {
 
         do {
             // Before the tunnel's settings, so a name is resolved outside the tunnel, and before anything dials it.
-            if let host { try await NodeAddress.refuseNonPublic(host) }
+            // A name is recorded as the addresses it resolved to, so the split-tunnel proxy needs no lookup of its own.
+            var node: String?
+            if let host { node = try await NodeAddress.recordedNode(host) }
             // On every platform, for `TunnelManager.connectedNode()`. Before the tunnel's interface appears, so the
             // macOS split-tunnel proxy sees both together.
-            TunnelStateStore.record(isUp: true, server: host)
+            TunnelStateStore.record(isUp: true, server: node)
             try await setTunnelNetworkSettings(
                 Self.settingDNS(on: makeNetworkSettings(network: network), servers: TunnelConfigDirectories.dns())
             )

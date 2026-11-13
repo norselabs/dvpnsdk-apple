@@ -69,6 +69,21 @@ public enum SplitTunnelTraffic {
         hosts(addresses)
     }
 
+    /// The node's addresses from what its tunnel recorded (`TunnelStateStore.server`): the addresses a proxy engine
+    /// recorded for a name, comma-separated, or one address, or a host name, which `resolve` looks up. Each address
+    /// once, in order.
+    package static func nodeAddresses(
+        recorded node: String,
+        resolve: (String) -> [String] = NodeAddress.resolve
+    ) -> [String] {
+        var addresses: [String] = []
+        for part in node.split(separator: ",").map(String.init) {
+            let found = IPv4Address(part) != nil || IPv6Address(part) != nil ? [part] : resolve(part)
+            addresses += found.filter { !addresses.contains($0) }
+        }
+        return addresses
+    }
+
     /// Each address as a destination of its own, on any port; what is neither an IPv4 nor an IPv6 address is skipped.
     private static func hosts(_ addresses: [String]) -> [Destination] {
         addresses.compactMap { address in
