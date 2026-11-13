@@ -71,7 +71,8 @@ package enum NodeAddress {
     }
 
     /// `host`'s addresses through the system's resolver, numeric, each once, in the resolver's order; empty when it
-    /// does not resolve. Blocks while the resolver runs.
+    /// does not resolve. An answer that cannot be written as an address is returned as an empty string, which
+    /// `isNonPublic(_:)` refuses. Blocks while the resolver runs.
     package static func resolve(_ host: String) -> [String] {
         var hints = addrinfo(
             ai_flags: 0, ai_family: AF_UNSPEC, ai_socktype: SOCK_STREAM, ai_protocol: 0,
@@ -83,10 +84,12 @@ package enum NodeAddress {
         var addresses: [String] = []
         for info in sequence(first: first, next: { $0.pointee.ai_next }) {
             var buffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-            guard getnameinfo(
+            let isWritten = getnameinfo(
                 info.pointee.ai_addr, info.pointee.ai_addrlen, &buffer, socklen_t(buffer.count), nil, 0, NI_NUMERICHOST
-            ) == 0 else { continue }
-            let address = String(decoding: buffer.prefix { $0 != 0 }.map(UInt8.init(bitPattern:)), as: UTF8.self)
+            ) == 0
+            let address = isWritten
+                ? String(decoding: buffer.prefix { $0 != 0 }.map(UInt8.init(bitPattern:)), as: UTF8.self)
+                : ""
             if !addresses.contains(address) { addresses.append(address) }
         }
         return addresses

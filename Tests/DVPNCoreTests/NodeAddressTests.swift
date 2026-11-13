@@ -131,6 +131,12 @@ struct NodeAddressTests {
         #expect(NodeAddress.isNonPublic(address) == ConnectionCredentials.isNonPublicAddress(address))
     }
 
+    /// A resolver answer that cannot be written as an address refuses the name.
+    @Test
+    func anUnwrittenAnswerRefusesTheName() async {
+        #expect(await NodeAddress.check("node.example.com") { _ in ["203.0.113.10", ""] } == .refused(""))
+    }
+
     /// What is not an address counts as not public: a resolver answer the check cannot read never passes.
     @Test(arguments: ["", "not-an-address", "fe80::zz"])
     func whatIsNotAnAddressIsNotPublic(text: String) {
