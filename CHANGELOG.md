@@ -15,12 +15,13 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 - `TunnelManager.forgetStoredConfiguration()`: deletes every engine's stored configuration — WireGuard's file,
   Xray's source and Hysteria's configuration — each with the directory that holds it. `restart()` then throws
   `.noStoredConfiguration`. It touches neither the tunnel profile nor a running tunnel, so an on-demand start by
-  the system fails until a start writes a configuration again; a WireGuard profile left without its file is removed
-  as an orphan by the next `TunnelManager` in a new process, a proxy engine's is not. Turn on-demand off, or stop
-  the tunnel, before the call to avoid either.
+  the system fails until a start writes a configuration again; stop the tunnel before the call to avoid that.
 
 ### Changed
 
+- A VPN profile whose engine has no stored configuration is kept, with on-demand turned off, when the first
+  `TunnelManager` call of a process loads the profiles; a WireGuard profile was removed, which made the system ask
+  for the VPN permission again at the next start, and a proxy engine's kept on-demand on.
 - An Xray or Hysteria tunnel records its node in `TunnelStateStore` as the addresses its host name resolved to,
   comma-separated, so `TunnelManager.connectedNode()` returns that list and the macOS split-tunnel proxy leaves those
   addresses out with no lookup of its own. A WireGuard tunnel still records its host as written: WireGuardKit does

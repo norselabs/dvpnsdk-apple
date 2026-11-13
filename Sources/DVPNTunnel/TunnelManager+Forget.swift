@@ -15,10 +15,9 @@ public extension TunnelManager {
     /// each with the directory that holds it. `restart()` then throws `.noStoredConfiguration` and `start(from:)`
     /// needs new credentials.
     ///
-    /// It touches neither the tunnel profile nor a running tunnel. A profile left pointing at a WireGuard
-    /// configuration that is gone is removed by the next `TunnelManager` in a new process, as an orphan; a proxy
-    /// engine's profile is not, so until a start writes a configuration again, an on-demand start by the system
-    /// fails. Turn on-demand off, or stop the tunnel, before this call to avoid either.
+    /// It touches neither the tunnel profile nor a running tunnel: until a start writes a configuration again, an
+    /// on-demand start by the system fails. The next `TunnelManager` in a new process turns on-demand off on such a
+    /// profile and keeps it. Stop the tunnel before this call, which turns on-demand off at once.
     ///
     /// Every store is cleared even when another one fails; a failure is logged.
     nonisolated func forgetStoredConfiguration() {

@@ -78,6 +78,42 @@ struct TunnelManagerForgetTests {
         }
     }
 
+    /// After a forget, the next process's service keeps the profile, whichever engine it was last, with on-demand off:
+    /// the system no longer starts a tunnel that has nothing to start from, and the profile is not removed.
+    @Test(arguments: TunnelProtocolID.allCases)
+    func theNextLaunchKeepsTheProfileWithOnDemandOff(lastEngine: TunnelProtocolID) async throws {
+        try await withConfigurationFilesOfItsOwn { _ in
+            let profile = FakeTunnelProfile(name: "WireGuard", providerBundleID: "com.example.vpn.wireguard-ne")
+            let (manager, store) = makeManager(over: profile)
+            try await start(lastEngine, with: manager)
+            #expect(profile.isOnDemandEnabled)
+
+            manager.forgetStoredConfiguration()
+            let service = try await TunnelsService.create(store: store, clock: StepClock())
+
+            #expect(profile.removals == 0, "the profile was removed")
+            #expect(!profile.isOnDemandEnabled, "on-demand is still on, with nothing to start from")
+            #expect(service.tunnels.count == 1)
+        }
+    }
+
+    /// A profile whose configuration is still stored keeps on-demand as it was.
+    @Test(arguments: TunnelProtocolID.allCases)
+    func theNextLaunchLeavesAConfiguredProfileAlone(lastEngine: TunnelProtocolID) async throws {
+        try await withConfigurationFilesOfItsOwn { _ in
+            let profile = FakeTunnelProfile(name: "WireGuard", providerBundleID: "com.example.vpn.wireguard-ne")
+            let (manager, store) = makeManager(over: profile)
+            try await start(lastEngine, with: manager)
+            let saves = profile.saves
+
+            _ = try await TunnelsService.create(store: store, clock: StepClock())
+
+            #expect(profile.isOnDemandEnabled)
+            #expect(profile.saves == saves)
+            #expect(profile.removals == 0)
+        }
+    }
+
     /// A forget with nothing stored is no error, and a start after it stores again.
     @Test
     func aForgetWithNothingStoredIsNoError() async throws {
@@ -171,7 +207,10 @@ struct TunnelManagerForgetTests {
 
     /// A manager over a service of one fake profile, which every engine rewrites.
     private func makeManager() -> TunnelManager {
-        let profile = FakeTunnelProfile(name: "WireGuard", providerBundleID: "com.example.vpn.wireguard-ne")
+        makeManager(over: FakeTunnelProfile(name: "WireGuard", providerBundleID: "com.example.vpn.wireguard-ne")).manager
+    }
+
+    private func makeManager(over profile: FakeTunnelProfile) -> (manager: TunnelManager, store: FakeTunnelProfileStore) {
         let store = FakeTunnelProfileStore()
         store.profiles = [profile]
         let service = TunnelsService(tunnelProviders: [profile], store: store, clock: StepClock())
@@ -181,6 +220,6 @@ struct TunnelManagerForgetTests {
         }
         let manager = TunnelManager(settings: FakeTunnelSettings(), configuration: configuration)
         manager.attach(service)
-        return manager
+        return (manager, store)
     }
 }

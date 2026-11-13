@@ -76,36 +76,27 @@ extension TunnelsService {
             throw .loadTunnelsFailed(systemError: error)
         }
 
-        // Proxy engines keep no per-tunnel configuration reference, nothing to verify.
-        if managers.first?.provider?.tunnelDescriptor?.readiness == .immediate {
-            return TunnelsService(tunnelProviders: managers, store: store, clock: clock)
-        }
-        return TunnelsService(tunnelProviders: await cleanUpOrphaned(managers), store: store, clock: clock)
+        await turnOnDemandOffForOrphans(managers)
+        return TunnelsService(tunnelProviders: managers, store: store, clock: clock)
     }
 
-    /// Drops tunnels whose stored configuration file no longer exists.
-    private static func cleanUpOrphaned(
-        _ managers: [any TunnelProfile]
-    ) async -> [any TunnelProfile] {
-        var kept: [any TunnelProfile] = []
-        for manager in managers {
-            if let provider = manager.provider, !provider.hasStoredConfiguration() {
-                logger.info(
-                    """
-                    Removing orphaned tunnel with invalid configuration: \
-                    \(manager.localizedDescription ?? "<unknown>", privacy: .public)
-                    """
-                )
-                do {
-                    try await manager.removeFromPreferences()
-                } catch {
-                    logger.error("Failed to remove orphaned tunnel: \(error.logDescription, privacy: .public)")
-                }
-            } else {
-                kept.append(manager)
+    /// Turns on-demand off on every profile whose engine has no stored configuration (after
+    /// `TunnelManager.forgetStoredConfiguration()`, or a cache the system purged), so the system stops starting a tunnel
+    /// that cannot start. The profile itself is kept, and the next start writes a configuration and turns on-demand on
+    /// again. A save the system refuses is logged and leaves the profile as it was.
+    private static func turnOnDemandOffForOrphans(_ managers: [any TunnelProfile]) async {
+        for manager in managers where manager.isOnDemandEnabled {
+            guard let provider = manager.provider, !provider.hasStoredConfiguration() else { continue }
+            logger.notice(
+                "No stored configuration for '\(manager.localizedDescription ?? "<unknown>", privacy: .public)': turning on-demand off"
+            )
+            manager.isOnDemandEnabled = false
+            do {
+                try await manager.saveToPreferences()
+            } catch {
+                logger.error("Turning on-demand off failed: \(error.logDescription, privacy: .public)")
             }
         }
-        return kept
     }
 }
 
