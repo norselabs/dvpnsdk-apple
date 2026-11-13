@@ -10,15 +10,36 @@ public enum TunnelConfigDirectories {
     public static var suiteName: String { TunnelEnvironment.appGroupID }
 
     private static func createDirectory(at url: URL?) throws -> URL {
-        guard let url else {
+        guard var url else {
             throw NSError.newError("Config file does not exist")
         }
-        guard FileManager.default.fileExists(atPath: url.path) == false else {
-            return url
+        if FileManager.default.fileExists(atPath: url.path) == false {
+            try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true, attributes: nil)
         }
-        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true, attributes: nil)
+        excludeFromBackup(&url)
         return url
     }
+
+    /// Marks `url` as excluded from device backups, unless it already is. The flag belongs to the directory, not to
+    /// the files in it, so a directory an earlier version made gets it here, and a file written atomically keeps it.
+    private static func excludeFromBackup(_ url: inout URL) {
+        do {
+            guard try url.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup != true else {
+                return
+            }
+            var values = URLResourceValues()
+            values.isExcludedFromBackup = true
+            try url.setResourceValues(values)
+        } catch {
+            logger.error("Unable to exclude the tunnel config directory from backups: \(error.logDescription, privacy: .public)")
+        }
+    }
+
+    /// How every engine writes its configuration file: atomically, readable from the device's first unlock on.
+    package static let configurationFileWriting: Data.WritingOptions = [
+        .atomic,
+        .completeFileProtectionUntilFirstUserAuthentication,
+    ]
 
     /// Root of the tunnel configuration files: inside the App Group container, or the directory a test task keeps them in.
     package static var homeDirectory: URL? {

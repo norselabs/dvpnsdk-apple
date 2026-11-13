@@ -12,9 +12,19 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 - `APIError.Reason.tooManyRequests`: the backend's `tooManyRequests` code (429: too many registrations from one
   address, or credentials requests from one device). It is not transient and reveals no device state; a 429 without
   the code has no reason. A `switch` over `APIError.Reason` must handle the new case.
+- `TunnelManager.forgetStoredConfiguration()`: deletes every engine's stored configuration — WireGuard's file,
+  Xray's source and Hysteria's configuration — each with the directory that holds it. `restart()` then throws
+  `.noStoredConfiguration`. It touches neither the tunnel profile nor a running tunnel, so an on-demand start by
+  the system fails until a start writes a configuration again; a WireGuard profile left without its file is removed
+  as an orphan by the next `TunnelManager` in a new process, a proxy engine's is not. Turn on-demand off, or stop
+  the tunnel, before the call to avoid either.
 
 ### Changed
 
+- Each engine's stored tunnel configuration is written with `completeFileProtectionUntilFirstUserAuthentication`,
+  so it is readable from the device's first unlock on, and the directory holding them is excluded from device
+  backups. Files an extension writes elsewhere, such as the SOCKS5 proxy's generated settings in its own caches,
+  are unchanged.
 - The backend's `serverInactive` code (503: the server takes no connections now) reads as
   `APIError.Reason.serverUnavailable`, whose raw value is now `serverInactive`, instead of `temporaryUnavailable`.
   Both reasons are transient.
