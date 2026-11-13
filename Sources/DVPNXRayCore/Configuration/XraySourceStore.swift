@@ -52,7 +52,7 @@ public enum XraySourceStore {
         }
         let data = try JSONEncoder().encode(source)
         // Atomic and throwing: a failed write must fail the start, not leave the previous node's config to run.
-        try data.write(to: destinationURL, options: .atomic)
+        try data.write(to: destinationURL, options: TunnelConfigDirectories.configurationFileWriting)
         logger.info("Xray source saved")
     }
 

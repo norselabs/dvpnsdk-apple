@@ -10,6 +10,28 @@ import Testing
 
 /// What the split-tunnel proxy is offered and what it never sees.
 struct SplitTunnelTrafficTests {
+    // MARK: The tunnel's node
+
+    /// A proxy engine records the addresses a name resolved to: the split-tunnel proxy reads them as they are, with
+    /// no lookup of its own.
+    @Test
+    func recordedAddressesAreReadWithoutALookup() {
+        let addresses = SplitTunnelTraffic.nodeAddresses(recorded: "203.0.113.10,2001:db8::10") { name in
+            Issue.record("looked up \(name)")
+            return []
+        }
+
+        #expect(addresses == ["203.0.113.10", "2001:db8::10"])
+    }
+
+    /// WireGuard records its host as written: a name is still looked up.
+    @Test
+    func aRecordedNameIsLookedUp() {
+        let addresses = SplitTunnelTraffic.nodeAddresses(recorded: "node.example.com") { _ in ["203.0.113.10"] }
+
+        #expect(addresses == ["203.0.113.10"])
+    }
+
     /// The system's DHCP never reaches the proxy: its renewals share one socket that a proxy which stops or dies
     /// would take down with it.
     @Test(arguments: [UInt16(67), 68, 546, 547])

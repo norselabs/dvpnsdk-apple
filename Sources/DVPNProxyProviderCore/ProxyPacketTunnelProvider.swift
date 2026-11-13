@@ -42,6 +42,8 @@ open class ProxyPacketTunnelProvider: NEPacketTunnelProvider {
         nil
     }
 
+    /// The tunnel's addresses, routes and MTU. Its DNS is set afterwards, over whatever this sets
+    /// (`settingDNS(on:servers:in:)`), so an override need not set it, and what an override sets is replaced.
     open func makeNetworkSettings(network: NetworkModel) -> NEPacketTunnelNetworkSettings {
         let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "254.1.1.1")
         settings.mtu = NSNumber(value: mtu)
@@ -64,7 +66,17 @@ open class ProxyPacketTunnelProvider: NEPacketTunnelProvider {
             }
             return settings
         }()
-        settings.dnsSettings = Self.dnsSettings(servers: TunnelConfigDirectories.dns())
+        return settings
+    }
+
+    /// `settings` with the tunnel's DNS set on them, replacing any DNS they hold: what `startTunnel` hands the system
+    /// after `makeNetworkSettings(network:)` returns.
+    static func settingDNS(
+        on settings: NEPacketTunnelNetworkSettings,
+        servers: [String],
+        in defaults: UserDefaults = .shared
+    ) -> NEPacketTunnelNetworkSettings {
+        settings.dnsSettings = dnsSettings(servers: servers, in: defaults)
         return settings
     }
 
@@ -85,12 +97,18 @@ open class ProxyPacketTunnelProvider: NEPacketTunnelProvider {
         let network = NetworkModel.default
         let host = nodeHost
         logger.notice("\(NodeAddressStore.startLine(host: host), privacy: .public)")
-        // On every platform, for `TunnelManager.connectedNode()`. Before the tunnel's interface appears, so the macOS
-        // split-tunnel proxy sees both together.
-        TunnelStateStore.record(isUp: true, server: host)
 
         do {
-            try await setTunnelNetworkSettings(makeNetworkSettings(network: network))
+            // Before the tunnel's settings, so a name is resolved outside the tunnel, and before anything dials it.
+            // A name is recorded as the addresses it resolved to, so the split-tunnel proxy needs no lookup of its own.
+            var node: String?
+            if let host { node = try await NodeAddress.recordedNode(host) }
+            // On every platform, for `TunnelManager.connectedNode()`. Before the tunnel's interface appears, so the
+            // macOS split-tunnel proxy sees both together.
+            TunnelStateStore.record(isUp: true, server: node)
+            try await setTunnelNetworkSettings(
+                Self.settingDNS(on: makeNetworkSettings(network: network), servers: TunnelConfigDirectories.dns())
+            )
             let proxy = try LocalProxy.random()
             try await startProxy(network: network, proxy: proxy)
             try startSocks5Tunnel(proxy: proxy)

@@ -19,8 +19,9 @@ public enum TunnelsServiceError: Error, Sendable {
     case removeTunnelFailed(systemError: Error)
     case emptyCredentials
     /// The node's address is not one the SDK dials: not an IPv4 address in four decimal numbers, an IPv6 address or a
-    /// host name, or the address of this device, a private or shared network, a link, multicast, or a reserved or
-    /// IPv4-mapped range (`ConnectionCredentials` refuses the same when it decodes).
+    /// host name, or the address of this device, a private or shared network, a link, multicast, the benchmarking range,
+    /// a reserved or IPv4-mapped range, or an IPv4-compatible or NAT64 address whose IPv4 is one of those
+    /// (`ConnectionCredentials` refuses the same when it decodes).
     case refusedNodeAddress
     case unsupportedProtocol
     /// `TunnelManager.restart()` found nothing stored to start the tunnel from.

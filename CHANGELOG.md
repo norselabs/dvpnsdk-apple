@@ -12,21 +12,47 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 - `APIError.Reason.tooManyRequests`: the backend's `tooManyRequests` code (429: too many registrations from one
   address, or credentials requests from one device). It is not transient and reveals no device state; a 429 without
   the code has no reason. A `switch` over `APIError.Reason` must handle the new case.
+- `TunnelManager.forgetStoredConfiguration()`: deletes every engine's stored configuration — WireGuard's file,
+  Xray's source and Hysteria's configuration — each with the directory that holds it. `restart()` then throws
+  `.noStoredConfiguration`. It touches neither the tunnel profile nor a running tunnel, so an on-demand start by
+  the system fails until a start writes a configuration again; stop the tunnel before the call to avoid that.
 
 ### Changed
 
+- `TunnelManager.stop()` turns on-demand off also when the tunnel is already down, as between two starts the system
+  makes, which costs it a save of the profile; with on-demand already off it still returns at once.
+- A VPN profile whose engine has no stored configuration is kept, with on-demand turned off, when the first
+  `TunnelManager` call of a process loads the profiles; a WireGuard profile was removed, which made the system ask
+  for the VPN permission again at the next start, and a proxy engine's kept on-demand on.
+- An Xray or Hysteria tunnel records its node in `TunnelStateStore` as the addresses its host name resolved to,
+  comma-separated, so `TunnelManager.connectedNode()` returns that list and the macOS split-tunnel proxy leaves those
+  addresses out with no lookup of its own. A WireGuard tunnel still records its host as written: WireGuardKit does
+  not expose the address it dials, so the proxy still looks a name up.
+- A proxy tunnel's DNS settings are set after `ProxyPacketTunnelProvider.makeNetworkSettings(network:)` returns,
+  over whatever it set: a subclass that builds its own settings gets the provider's DNS over HTTPS without setting
+  it, and DNS it sets itself is replaced.
+- Each engine's stored tunnel configuration is written with `completeFileProtectionUntilFirstUserAuthentication`,
+  so it is readable from the device's first unlock on, and the directory holding them is excluded from device
+  backups. Files an extension writes elsewhere, such as the SOCKS5 proxy's generated settings in its own caches,
+  are unchanged.
 - The backend's `serverInactive` code (503: the server takes no connections now) reads as
   `APIError.Reason.serverUnavailable`, whose raw value is now `serverInactive`, instead of `temporaryUnavailable`.
   Both reasons are transient.
 
 ### Fixed
 
+- A node given as a host name is resolved before every start — `TunnelManager.start(from:)`, and each packet
+  tunnel provider when the system starts it, so `restart()` and on-demand starts too — and refused when any address
+  it resolves to is not public (the ranges below). The engine is still given the name and looks it up again when it
+  dials, so a resolver that answers differently the second time is not caught; a name that resolves to nothing is
+  left to the engine. The address ranges are also checked on those provider starts, not only in `start(from:)`.
 - A node's address must lead to the internet: `ConnectionCredentials` no longer decodes, and
   `TunnelManager.start(from:)` no longer starts, a node at an address of the device itself, a private or shared
-  network (10/8, 100.64/10, 172.16/12, 192.168/16, fc00::/7), a link (169.254/16, fe80::/10), multicast, or the
-  0/8, 240/4 or IPv4-mapped ranges, which would send the tunnel's traffic into the user's own network. An IPv4
-  address must be four decimal numbers, and a host name's last label must start with a letter: the system's resolver
-  reads forms such as `127.1` or `0x7f000001` as addresses.
+  network (10/8, 100.64/10, 172.16/12, 192.168/16, fc00::/7), a link (169.254/16, fe80::/10), multicast, the
+  benchmarking range (198.18/15), the 0/8, 240/4 or IPv4-mapped ranges, or an IPv4-compatible (`::a.b.c.d`) or NAT64
+  (`64:ff9b::/96`) address whose IPv4 is one of those, which would send the tunnel's traffic into the user's own
+  network. An IPv4 address must be four decimal numbers, and a host name's last label must start with a letter: the
+  system's resolver reads forms such as `127.1` or `0x7f000001` as addresses.
 - An AmneziaWG node's values cannot crash the WireGuard extension or add settings: `applyAmneziaWG(_:)` refuses a
   value with a line break or control character, an `S4` above 388 (past which a packet no longer fits the engine's
   1700-byte buffer on iOS and tvOS), and an `I1`–`I5` that is not `<b>`, `<t>`, `<r>`, `<rc>` and `<rd>` tags with

@@ -13,6 +13,7 @@ import WireGuardKitTypes
 /// The tunnel service against fake profiles: one profile for every engine, activation and its
 /// failures, stopping, and profiles changed outside the app. `StepClock` makes every timeout elapse at once.
 @MainActor
+@Suite(.sharesTunnelState)
 struct TunnelsServiceTests {
     private let xray = TunnelProtocolDescriptor(id: .xray, providerBundleID: "com.example.vpn.v2ray-ne", tunnelName: "Xray", readiness: .immediate)
     private let hysteria = TunnelProtocolDescriptor(
@@ -216,6 +217,37 @@ struct TunnelsServiceTests {
 
         #expect(!profile.isOnDemandEnabled)
         #expect(profile.saves == 1)
+        #expect(profile.stops == 1)
+        #expect(tunnel.status == .disconnected)
+    }
+
+    /// A tunnel that is down with on-demand still on, as between two starts the system makes, has on-demand turned off,
+    /// and nothing to stop.
+    @Test
+    func stoppingADownTunnelStillTurnsOnDemandOff() async {
+        let profile = FakeTunnelProfile(name: "Xray", providerBundleID: xray.providerBundleID)
+        profile.isOnDemandEnabled = true
+        let (service, _) = makeService([profile])
+
+        #expect(await service.startDeactivationOfActiveTunnel() == false)
+
+        #expect(!profile.isOnDemandEnabled)
+        #expect(profile.saves == 1)
+        #expect(profile.stops == 0)
+    }
+
+    /// The system starting the tunnel on demand while on-demand is being turned off: the stop reads the status again
+    /// after the save, and stops the tunnel that came up.
+    @Test
+    func aTunnelTheSystemStartsDuringTheSaveIsStopped() async throws {
+        let profile = FakeTunnelProfile(name: "Xray", providerBundleID: xray.providerBundleID)
+        profile.isOnDemandEnabled = true
+        let (service, _) = makeService([profile])
+        let tunnel = try #require(service.tunnels.first)
+        profile.onSave = { profile.report(.connected) }
+
+        #expect(await service.startDeactivationOfActiveTunnel())
+
         #expect(profile.stops == 1)
         #expect(tunnel.status == .disconnected)
     }

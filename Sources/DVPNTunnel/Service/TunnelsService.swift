@@ -76,36 +76,29 @@ extension TunnelsService {
             throw .loadTunnelsFailed(systemError: error)
         }
 
-        // Proxy engines keep no per-tunnel configuration reference, nothing to verify.
-        if managers.first?.provider?.tunnelDescriptor?.readiness == .immediate {
-            return TunnelsService(tunnelProviders: managers, store: store, clock: clock)
-        }
-        return TunnelsService(tunnelProviders: await cleanUpOrphaned(managers), store: store, clock: clock)
+        let service = TunnelsService(tunnelProviders: managers, store: store, clock: clock)
+        await service.turnOnDemandOffForOrphans()
+        return service
     }
 
-    /// Drops tunnels whose stored configuration file no longer exists.
-    private static func cleanUpOrphaned(
-        _ managers: [any TunnelProfile]
-    ) async -> [any TunnelProfile] {
-        var kept: [any TunnelProfile] = []
-        for manager in managers {
-            if let provider = manager.provider, !provider.hasStoredConfiguration() {
-                logger.info(
-                    """
-                    Removing orphaned tunnel with invalid configuration: \
-                    \(manager.localizedDescription ?? "<unknown>", privacy: .public)
-                    """
-                )
-                do {
-                    try await manager.removeFromPreferences()
-                } catch {
-                    logger.error("Failed to remove orphaned tunnel: \(error.logDescription, privacy: .public)")
-                }
-            } else {
-                kept.append(manager)
+    /// Turns on-demand off on every profile whose engine has no stored configuration (after
+    /// `TunnelManager.forgetStoredConfiguration()`, or a cache the system purged), so the system stops starting a tunnel
+    /// that cannot start. The profile itself is kept, and the next start writes a configuration and turns on-demand on
+    /// again. A save the system refuses is logged and leaves the profile as it was.
+    private func turnOnDemandOffForOrphans() async {
+        for tunnel in tunnels where tunnel.tunnelProvider.isOnDemandEnabled {
+            let manager = tunnel.tunnelProvider
+            guard let provider = manager.provider, !provider.hasStoredConfiguration() else { continue }
+            logger.notice("No stored configuration for '\(tunnel.name, privacy: .public)': turning on-demand off")
+            manager.isOnDemandEnabled = false
+            do {
+                try await performingOwnWrite { try await manager.saveToPreferences() }
+            } catch {
+                logger.error("Turning on-demand off failed: \(error.logDescription, privacy: .public)")
+                // The refused change stays in memory only: read the profile back as the system keeps it.
+                try? await manager.loadFromPreferences()
             }
         }
-        return kept
     }
 }
 
@@ -313,15 +306,20 @@ extension TunnelsService {
         logger.debug("\(tunnel.name, privacy: .public) is deactivated (status: \(String(describing: tunnel.status), privacy: .public))")
     }
 
-    /// Disables on-demand and stops the managed tunnel. Returns `false` when nothing was active.
+    /// Disables on-demand and stops the managed tunnel. On-demand is turned off also when the tunnel is already down, as
+    /// between two starts the system makes. Returns `false` when nothing was active to stop.
     @discardableResult
     func startDeactivationOfActiveTunnel() async -> Bool {
-        guard let tunnel = tunnels.last, tunnel.status != .disconnected else { return false }
+        guard let tunnel = tunnels.last else { return false }
+        let isActive = tunnel.status != .disconnected
+        guard isActive || tunnel.tunnelProvider.isOnDemandEnabled else { return false }
         do {
             try await set(onDemandEnabled: false, for: tunnel)
         } catch {
             logger.error("Failed to disable on-demand before deactivation: \(error.logDescription, privacy: .public)")
         }
+        // Read again after the save: the system may have started the tunnel on demand while it ran.
+        guard tunnel.status != .disconnected else { return false }
         await startDeactivation(of: tunnel)
         return true
     }

@@ -13,6 +13,7 @@ import WireGuardKitTypes
 /// `TunnelManager.restart()`: a WireGuard tunnel keeps everything but its resolvers, and with nothing stored to start
 /// from the tunnel is left as it is.
 @MainActor
+@Suite(.sharesTunnelState)
 struct TunnelManagerRestartTests {
     private let configuration = DVPNCoreConfiguration(
         appGroupID: "group.com.example.vpn.tests",

@@ -170,7 +170,7 @@ private extension SplitTunnelProxyProvider {
         network.includedNetworkRules = offering ? SplitTunnelTraffic.offered.map(Self.rule) : []
         // The tunnel's own traffic to its node is never offered: declined, a UDP flow breaks (Hysteria's QUIC).
         let node = offering ? offeredNode.withLock { $0 } : nil
-        let nodeRules = SplitTunnelTraffic.excluded(node: node.map(Self.addresses(of:)) ?? [])
+        let nodeRules = SplitTunnelTraffic.excluded(node: node.map { SplitTunnelTraffic.nodeAddresses(recorded: $0) } ?? [])
         if let node { logger.info("Split tunnel: the tunnel's node \(node, privacy: .public) is left out (\(nodeRules.count) address(es))") }
         network.excludedNetworkRules = (SplitTunnelTraffic.excluded + nodeRules).map(Self.rule)
         do {
@@ -179,26 +179,6 @@ private extension SplitTunnelProxyProvider {
             logger.error("Split tunnel: no rules were refused (\(error.logDescription, privacy: .public)); offering every flow")
             try await setRules(offering: true)
         }
-    }
-
-    /// `host`'s addresses: itself when it is one, else what the system resolves it to.
-    static func addresses(of host: String) -> [String] {
-        if IPv4Address(host) != nil || IPv6Address(host) != nil { return [host] }
-        var hints = addrinfo(ai_flags: 0, ai_family: AF_UNSPEC, ai_socktype: SOCK_STREAM, ai_protocol: 0, ai_addrlen: 0,
-                             ai_canonname: nil, ai_addr: nil, ai_next: nil)
-        var result: UnsafeMutablePointer<addrinfo>?
-        guard getaddrinfo(host, nil, &hints, &result) == 0, let first = result else { return [] }
-        defer { freeaddrinfo(first) }
-        var addresses: [String] = []
-        for info in sequence(first: first, next: { $0.pointee.ai_next }) {
-            var buffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-            if getnameinfo(info.pointee.ai_addr, info.pointee.ai_addrlen, &buffer, socklen_t(buffer.count), nil, 0,
-                           NI_NUMERICHOST) == 0
-            {
-                addresses.append(String(decoding: buffer.prefix { $0 != 0 }.map(UInt8.init(bitPattern:)), as: UTF8.self))
-            }
-        }
-        return Array(Set(addresses))
     }
 
     static func rule(for destination: SplitTunnelTraffic.Destination) -> NENetworkRule {

@@ -4,7 +4,9 @@
 //
 
 import DVPNCoreKit
+import DVPNHysteriaCore
 import DVPNWireGuardCore
+import DVPNXRayCore
 import NetworkExtension
 
 /// Dispatches per-protocol configuration storage. WireGuard keeps a config file in the
@@ -20,12 +22,17 @@ extension NETunnelProviderProtocol {
         tunnelDescriptor?.id
     }
 
-    /// `false` when the provider points at a configuration that no longer exists on disk.
+    /// `false` when the provider's engine has no stored configuration on disk to start from.
     func hasStoredConfiguration() -> Bool {
         switch tunnelProtocolID {
         case .wireGuard:
             return verifyConfigurationReference()
-        case .xray, .hysteria, nil:
+        case .xray:
+            // A file an older version wrote does not decode, and `TunnelManager` removes it once loaded.
+            return (try? XraySourceStore.loadCurrent()) != nil
+        case .hysteria:
+            return HysteriaConfigurationStore.exists()
+        case nil:
             return true
         }
     }

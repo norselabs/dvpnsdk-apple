@@ -30,7 +30,7 @@ public struct WireGuardFileConfiguration: Codable, Sendable {
 
 // MARK: - WireGuardFileStorage
 
-final class WireGuardFileStorage {
+package final class WireGuardFileStorage {
     static func save(
         tunnelConfiguration: TunnelConfiguration,
         named name: String
@@ -54,7 +54,7 @@ final class WireGuardFileStorage {
         let data = try JSONEncoder().encode(config)
 
         // Atomic and throwing: a failed write must fail the start, not leave the previous node's config to run.
-        try data.write(to: destinationURL, options: .atomic)
+        try data.write(to: destinationURL, options: TunnelConfigDirectories.configurationFileWriting)
 
         logger.info("WireGuard config saved")
     }
@@ -81,7 +81,7 @@ final class WireGuardFileStorage {
         return try config.toTunnelConfiguration()
     }
 
-    static func delete() throws {
+    package static func delete() throws {
         guard let folderURL = TunnelConfigDirectories.wireguardConfigDirectory?.appending(
             component: TunnelConfigDirectories.wireguardCurrentConfigKey,
             directoryHint: .isDirectory

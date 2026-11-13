@@ -11,6 +11,7 @@ import Testing
 
 /// The WireGuard handshake wait runs on the injected clock, deadline included.
 @MainActor
+@Suite(.sharesTunnelState)
 struct HandshakeWaitTests {
     init() {
         DVPNCore.bootstrap(

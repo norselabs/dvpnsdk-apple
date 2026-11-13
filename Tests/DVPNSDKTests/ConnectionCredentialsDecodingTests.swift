@@ -253,7 +253,8 @@ struct ConnectionCredentialsDecodingTests {
         "203.0.113.10", "2001:db8::1", "eu-at-1.suchnode.net", "1node.example.com",
         "9.255.255.255", "11.0.0.1", "100.63.255.255", "100.128.0.1", "126.255.255.255", "128.0.0.1", "169.253.0.1",
         "169.255.0.1", "172.15.255.255", "172.32.0.1", "192.167.255.255", "192.169.0.1", "223.255.255.255",
-        "::2", "fbff::1", "fe7f::1", "fec0::1", "feff::1", "2001:4860:4860::8888",
+        "198.17.255.255", "198.20.0.1", "::cb00:710a", "64:ff9b::cb00:710a", "64:ff9a::a00:1",
+        "fbff::1", "fe7f::1", "fec0::1", "feff::1", "2001:4860:4860::8888",
     ])
     func aNodesAddressOrNameIsItsHost(host: String) throws {
         let data = try credentialsJSON(protocol: "WIREGUARD", handshake: wireGuardHandshake, addrs: [host])
@@ -281,14 +282,18 @@ struct ConnectionCredentialsDecodingTests {
         }
     }
 
-    /// An address of this device, a private or shared network, a link, multicast, or a reserved or IPv4-mapped range
-    /// fails the decoding: a node there would send the tunnel's traffic into the user's own network. One case per
-    /// range, at both ends where the range is not a whole first byte.
+    /// An address of this device, a private or shared network, a link, multicast, the benchmarking range, a reserved or
+    /// IPv4-mapped range, or an IPv4-compatible or NAT64 address whose IPv4 is one of those, fails the decoding: a node
+    /// there would send the tunnel's traffic into the user's own network. One case per range, at both ends where the
+    /// range is not a whole first byte.
     @Test(arguments: [
         "0.0.0.0", "0.255.255.255", "10.0.0.1", "10.255.255.255", "100.64.0.0", "100.127.255.255", "127.0.0.1",
         "127.255.255.254", "169.254.0.1", "169.254.169.254", "172.16.0.1", "172.31.255.255", "192.168.0.1",
         "192.168.255.255", "224.0.0.1", "239.255.255.250", "240.0.0.1", "255.255.255.255",
         "::", "::1", "fc00::1", "fdff:ffff::1", "fe80::1", "febf:ffff::1", "ff02::1", "::ffff:192.168.1.1", "::ffff:8.8.8.8",
+        "198.18.0.0", "198.19.255.255",
+        "64:ff9b::a00:1", "64:ff9b::c0a8:101", "64:ff9b::7f00:1", "64:ff9b::c612:1",
+        "::2", "::a00:1", "::c0a8:101", "::7f00:1",
     ])
     func aNonPublicAddressFailsTheDecoding(host: String) throws {
         let data = try credentialsJSON(protocol: "V2RAY", handshake: ["metadata": []], addrs: [host])

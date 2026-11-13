@@ -20,6 +20,18 @@ extension TunnelManager {
         }
     }
 
+    /// Refuses a node given as a host name that resolves to an address that is not public (`NodeAddress.check`). The
+    /// node's packet tunnel provider runs the same check on every start the system makes.
+    func checkResolvedAddress(of credentials: ConnectionCredentials) async throws(TunnelsServiceError) {
+        let host = credentials.endpoint.host
+        guard case let .refused(address) = await NodeAddress.check(host) else { return }
+        let node = NodeAddressStore.describe(host: host.escapingControlCharacters, address: credentials.server?.address)
+        logger.error(
+            "Refused the \(credentials.nodeType.rawValue, privacy: .public) node \(node, privacy: .public): it resolves to \(address, privacy: .public), not a public address"
+        )
+        throw .refusedNodeAddress
+    }
+
     /// Logs the node a start connects to, before anything can fail.
     func logStart(of credentials: ConnectionCredentials) {
         logger.notice("\(Self.startLine(for: credentials), privacy: .public)")

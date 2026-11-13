@@ -8,6 +8,7 @@ import DVPNCoreKit
 import Foundation
 import Testing
 
+@Suite(.sharesTunnelState)
 struct XrayModelTests {
     init() {
         DVPNCore.bootstrap(

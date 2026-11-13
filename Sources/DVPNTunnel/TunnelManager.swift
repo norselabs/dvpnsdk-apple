@@ -63,8 +63,9 @@ public extension TunnelManager {
         (try? await loadService())?.tunnels.last?.status == .connected
     }
 
-    /// The node the running tunnel connects to, as its provider recorded it: an address or a host name, or nil while
-    /// the tunnel is down or when the provider did not say.
+    /// The node the running tunnel connects to, as its provider recorded it, or nil while the tunnel is down or when
+    /// the provider did not say: a proxy engine's addresses (a host name's, comma-separated), or the host as written
+    /// (an address, or WireGuard's host name).
     nonisolated func connectedNode() -> String? {
         TunnelStateStore.server()
     }
@@ -94,6 +95,7 @@ extension TunnelManager {
     /// for the WireGuard family, once the first handshake is seen).
     public func start(from credentials: ConnectionCredentials) async throws(TunnelsServiceError) {
         try checkAddress(of: credentials)
+        try await checkResolvedAddress(of: credentials)
         logStart(of: credentials)
         switch credentials.nodeType.tunnelProtocolID {
         case .wireGuard:
