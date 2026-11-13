@@ -94,6 +94,7 @@ extension TunnelManager {
     /// for the WireGuard family, once the first handshake is seen).
     public func start(from credentials: ConnectionCredentials) async throws(TunnelsServiceError) {
         try checkAddress(of: credentials)
+        try await checkResolvedAddress(of: credentials)
         logStart(of: credentials)
         switch credentials.nodeType.tunnelProtocolID {
         case .wireGuard:

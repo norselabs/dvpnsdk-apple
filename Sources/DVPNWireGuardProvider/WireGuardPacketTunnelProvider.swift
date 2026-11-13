@@ -68,6 +68,13 @@ open class WireGuardPacketTunnelProvider: NEPacketTunnelProvider {
 
         let host = tunnelConfiguration.peers.first?.endpoint.map { "\($0.host)" }
         logger.notice("\(NodeAddressStore.startLine(host: host), privacy: .public)")
+        do {
+            if let host { try await NodeAddress.refuseNonPublic(host) }
+        } catch {
+            logger.error("\(error.logDescription, privacy: .public)")
+            ExtensionLogFile.dump()
+            throw error
+        }
         // On every platform, for `TunnelManager.connectedNode()`. Before the tunnel's interface appears, so the macOS
         // split-tunnel proxy sees both together; the node it connects to is left out of the proxy.
         TunnelStateStore.record(isUp: true, server: host)

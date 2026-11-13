@@ -97,11 +97,13 @@ open class ProxyPacketTunnelProvider: NEPacketTunnelProvider {
         let network = NetworkModel.default
         let host = nodeHost
         logger.notice("\(NodeAddressStore.startLine(host: host), privacy: .public)")
-        // On every platform, for `TunnelManager.connectedNode()`. Before the tunnel's interface appears, so the macOS
-        // split-tunnel proxy sees both together.
-        TunnelStateStore.record(isUp: true, server: host)
 
         do {
+            // Before the tunnel's settings, so a name is resolved outside the tunnel, and before anything dials it.
+            if let host { try await NodeAddress.refuseNonPublic(host) }
+            // On every platform, for `TunnelManager.connectedNode()`. Before the tunnel's interface appears, so the
+            // macOS split-tunnel proxy sees both together.
+            TunnelStateStore.record(isUp: true, server: host)
             try await setTunnelNetworkSettings(
                 Self.settingDNS(on: makeNetworkSettings(network: network), servers: TunnelConfigDirectories.dns())
             )

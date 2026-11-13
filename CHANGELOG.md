@@ -34,6 +34,11 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ### Fixed
 
+- A node given as a host name is resolved before every start — `TunnelManager.start(from:)`, and each packet
+  tunnel provider when the system starts it, so `restart()` and on-demand starts too — and refused when any address
+  it resolves to is not public (the ranges below). The engine is still given the name and looks it up again when it
+  dials, so a resolver that answers differently the second time is not caught; a name that resolves to nothing is
+  left to the engine. The address ranges are also checked on those provider starts, not only in `start(from:)`.
 - A node's address must lead to the internet: `ConnectionCredentials` no longer decodes, and
   `TunnelManager.start(from:)` no longer starts, a node at an address of the device itself, a private or shared
   network (10/8, 100.64/10, 172.16/12, 192.168/16, fc00::/7), a link (169.254/16, fe80::/10), multicast, or the
