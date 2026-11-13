@@ -13,6 +13,7 @@ import WireGuardKitTypes
 /// The tunnel service against fake profiles: one profile for every engine, activation and its
 /// failures, stopping, and profiles changed outside the app. `StepClock` makes every timeout elapse at once.
 @MainActor
+@Suite(.sharesTunnelState)
 struct TunnelsServiceTests {
     private let xray = TunnelProtocolDescriptor(id: .xray, providerBundleID: "com.example.vpn.v2ray-ne", tunnelName: "Xray", readiness: .immediate)
     private let hysteria = TunnelProtocolDescriptor(

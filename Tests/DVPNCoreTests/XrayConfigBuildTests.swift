@@ -10,6 +10,7 @@ import DVPNSDK
 import Foundation
 import Testing
 
+@Suite(.sharesTunnelState)
 struct XrayConfigBuildTests {
     init() {
         DVPNCore.bootstrap(

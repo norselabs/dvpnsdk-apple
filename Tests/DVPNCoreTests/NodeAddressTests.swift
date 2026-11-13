@@ -14,7 +14,7 @@ import Testing
 ///
 /// Every start writes the shared `NodeAddressStore` (App Group defaults), so the suite runs serially.
 @MainActor
-@Suite(.serialized)
+@Suite(.serialized, .sharesTunnelState)
 struct NodeAddressTests {
     private let configuration = DVPNCoreConfiguration(
         appGroupID: "group.com.example.vpn.tests",

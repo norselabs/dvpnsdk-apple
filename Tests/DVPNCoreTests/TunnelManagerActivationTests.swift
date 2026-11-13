@@ -19,7 +19,7 @@ import WireGuardKitTypes
 /// Every proxy start clears the shared `ProxyStartErrorStore`, and every start past its checks writes the shared
 /// `NodeAddressStore` (App Group defaults), so the suite runs serially.
 @MainActor
-@Suite(.serialized)
+@Suite(.serialized, .sharesTunnelState)
 struct TunnelManagerActivationTests {
     private let configuration = DVPNCoreConfiguration(
         appGroupID: "group.com.example.vpn.tests",

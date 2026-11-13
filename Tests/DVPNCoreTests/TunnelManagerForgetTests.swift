@@ -20,7 +20,7 @@ import WireGuardKitTypes
 /// The descriptors match the other suites': `DVPNCore.bootstrap` writes a process-global one, and the suites run
 /// beside each other in one process.
 @MainActor
-@Suite(.serialized)
+@Suite(.serialized, .sharesTunnelState)
 struct TunnelManagerForgetTests {
     private let configuration = DVPNCoreConfiguration(
         appGroupID: "group.com.example.vpn.tests",

@@ -15,6 +15,7 @@ import WireGuardKitTypes
 /// An app that declares no WireGuard extension: its WireGuard credentials and profiles are refused, as an undeclared
 /// Xray or Hysteria is, instead of stopping the app.
 @MainActor
+@Suite(.sharesTunnelState)
 struct AppWithoutWireGuardTests {
     /// The extensions of the app under test. In this process only its manager gets them, as the process keeps the
     /// configuration every suite bootstraps, which declares WireGuard; the tests in a process of their own bootstrap them.
