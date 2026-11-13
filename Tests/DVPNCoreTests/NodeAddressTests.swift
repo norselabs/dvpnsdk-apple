@@ -48,6 +48,19 @@ struct NodeAddressTests {
         }
     }
 
+    /// A name resolving to the benchmarking range (the proxy tunnel's own interface address, 198.18.0.1, is in it), or to
+    /// a NAT64 or IPv4-compatible address whose IPv4 is not public, is refused; with a public IPv4 inside, it passes.
+    @Test(arguments: [
+        ("198.18.0.1", true), ("198.19.255.255", true), ("198.20.0.1", false),
+        ("64:ff9b::c0a8:101", true), ("64:ff9b::a00:1", true), ("64:ff9b::cb00:710a", false),
+        ("::c0a8:101", true), ("::7f00:1", true), ("::cb00:710a", false),
+    ])
+    func theBenchmarkingNAT64AndIPv4CompatibleRanges(answer: String, isRefused: Bool) async {
+        let check = await NodeAddress.check("node.example.com") { _ in [answer] }
+
+        #expect(check == (isRefused ? .refused(answer) : .addresses([answer])))
+    }
+
     /// One non-public address among public ones is enough to refuse a name.
     @Test(arguments: ["192.168.1.20", "10.0.0.5", "127.0.0.1", "fe80::1%en0", "::1", "::ffff:203.0.113.5"])
     func aNameWithOneNonPublicAddressIsRefused(nonPublic: String) async {
@@ -126,6 +139,9 @@ struct NodeAddressTests {
         "172.31.255.255", "172.32.0.1", "192.168.0.1", "192.169.0.1", "224.0.0.1", "240.0.0.1", "255.255.255.255",
         "203.0.113.5", "1.1.1.1", "::", "::1", "::2", "fc00::1", "fdff::1", "fe80::1", "febf::1", "fec0::1", "ff02::1",
         "::ffff:203.0.113.5", "2001:db8::1", "2606:4700::1111",
+        "198.17.255.255", "198.18.0.0", "198.18.0.1", "198.19.255.255", "198.20.0.1",
+        "64:ff9b::a00:1", "64:ff9b::c0a8:101", "64:ff9b::cb00:710a", "64:ff9a::a00:1",
+        "::a00:1", "::c0a8:101", "::cb00:710a", "::7f00:1",
     ])
     func theRangesMatchTheDecoders(address: String) {
         #expect(NodeAddress.isNonPublic(address) == ConnectionCredentials.isNonPublicAddress(address))

@@ -48,10 +48,11 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   left to the engine. The address ranges are also checked on those provider starts, not only in `start(from:)`.
 - A node's address must lead to the internet: `ConnectionCredentials` no longer decodes, and
   `TunnelManager.start(from:)` no longer starts, a node at an address of the device itself, a private or shared
-  network (10/8, 100.64/10, 172.16/12, 192.168/16, fc00::/7), a link (169.254/16, fe80::/10), multicast, or the
-  0/8, 240/4 or IPv4-mapped ranges, which would send the tunnel's traffic into the user's own network. An IPv4
-  address must be four decimal numbers, and a host name's last label must start with a letter: the system's resolver
-  reads forms such as `127.1` or `0x7f000001` as addresses.
+  network (10/8, 100.64/10, 172.16/12, 192.168/16, fc00::/7), a link (169.254/16, fe80::/10), multicast, the
+  benchmarking range (198.18/15), the 0/8, 240/4 or IPv4-mapped ranges, or an IPv4-compatible (`::a.b.c.d`) or NAT64
+  (`64:ff9b::/96`) address whose IPv4 is one of those, which would send the tunnel's traffic into the user's own
+  network. An IPv4 address must be four decimal numbers, and a host name's last label must start with a letter: the
+  system's resolver reads forms such as `127.1` or `0x7f000001` as addresses.
 - An AmneziaWG node's values cannot crash the WireGuard extension or add settings: `applyAmneziaWG(_:)` refuses a
   value with a line break or control character, an `S4` above 388 (past which a packet no longer fits the engine's
   1700-byte buffer on iOS and tvOS), and an `I1`–`I5` that is not `<b>`, `<t>`, `<r>`, `<rc>` and `<rd>` tags with

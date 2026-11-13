@@ -201,26 +201,35 @@ extension ConnectionCredentials: Decodable {
     }
 
     /// Whether `host` is an IP address that does not lead to the internet: this device, a private or shared network, a
-    /// link, multicast, or a reserved or IPv4-mapped range. A node there would send the tunnel's traffic into the
-    /// user's own network. A host name is not checked here.
+    /// link, multicast, the benchmarking range, a reserved or IPv4-mapped range, or an IPv4-compatible or NAT64
+    /// address whose IPv4 is one of those. A node there would send the tunnel's traffic into the user's own network.
+    /// A host name is not checked here.
     package static func isNonPublicAddress(_ host: String) -> Bool {
         if let address = IPv4Address(host) {
-            let bytes = [UInt8](address.rawValue)
-            switch (bytes[0], bytes[1]) {
-            case (0, _), (10, _), (127, _), (169, 254), (192, 168), (224..., _): return true // 224/4 and 240/4
-            case (100, 64 ... 127), (172, 16 ... 31): return true
-            default: return false
-            }
+            return isNonPublicIPv4([UInt8](address.rawValue))
         }
         if let address = IPv6Address(host) {
             let bytes = [UInt8](address.rawValue)
-            let isUnspecifiedOrLoopback = bytes.prefix(15).allSatisfy { $0 == 0 } && bytes[15] <= 1
-            return isUnspecifiedOrLoopback || address.isIPv4Mapped
+            // ::/96 (IPv4-compatible; `::` and `::1` among them) and 64:ff9b::/96 (NAT64) lead where their IPv4 does.
+            let prefix = Array(bytes.prefix(12))
+            if prefix.allSatisfy({ $0 == 0 }) || prefix == [0x00, 0x64, 0xFF, 0x9B, 0, 0, 0, 0, 0, 0, 0, 0] {
+                return isNonPublicIPv4(Array(bytes.suffix(4)))
+            }
+            return address.isIPv4Mapped
                 || bytes[0] & 0xFE == 0xFC // fc00::/7
                 || (bytes[0] == 0xFE && bytes[1] & 0xC0 == 0x80) // fe80::/10
                 || bytes[0] == 0xFF // ff00::/8
         }
         return false
+    }
+
+    /// The IPv4 half of the check, on an address's four bytes.
+    private static func isNonPublicIPv4(_ bytes: [UInt8]) -> Bool {
+        switch (bytes[0], bytes[1]) {
+        case (0, _), (10, _), (127, _), (169, 254), (192, 168), (224..., _): return true // 224/4 and 240/4
+        case (100, 64 ... 127), (172, 16 ... 31), (198, 18 ... 19): return true // 198.18/15: benchmarking
+        default: return false
+        }
     }
 
     private static func wireGuardEndpoint(
