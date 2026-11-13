@@ -19,6 +19,8 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ### Changed
 
+- `TunnelManager.stop()` turns on-demand off also when the tunnel is already down, as between two starts the system
+  makes; it still returns at once when there is nothing to stop.
 - A VPN profile whose engine has no stored configuration is kept, with on-demand turned off, when the first
   `TunnelManager` call of a process loads the profiles; a WireGuard profile was removed, which made the system ask
   for the VPN permission again at the next start, and a proxy engine's kept on-demand on.

@@ -28,7 +28,8 @@ extension NETunnelProviderProtocol {
         case .wireGuard:
             return verifyConfigurationReference()
         case .xray:
-            return XraySourceStore.exists()
+            // A file an older version wrote does not decode, and `TunnelManager` removes it once loaded.
+            return (try? XraySourceStore.loadCurrent()) != nil
         case .hysteria:
             return HysteriaConfigurationStore.exists()
         case nil:

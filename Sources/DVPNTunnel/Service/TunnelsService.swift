@@ -76,23 +76,23 @@ extension TunnelsService {
             throw .loadTunnelsFailed(systemError: error)
         }
 
-        await turnOnDemandOffForOrphans(managers)
-        return TunnelsService(tunnelProviders: managers, store: store, clock: clock)
+        let service = TunnelsService(tunnelProviders: managers, store: store, clock: clock)
+        await service.turnOnDemandOffForOrphans()
+        return service
     }
 
     /// Turns on-demand off on every profile whose engine has no stored configuration (after
     /// `TunnelManager.forgetStoredConfiguration()`, or a cache the system purged), so the system stops starting a tunnel
     /// that cannot start. The profile itself is kept, and the next start writes a configuration and turns on-demand on
     /// again. A save the system refuses is logged and leaves the profile as it was.
-    private static func turnOnDemandOffForOrphans(_ managers: [any TunnelProfile]) async {
-        for manager in managers where manager.isOnDemandEnabled {
+    private func turnOnDemandOffForOrphans() async {
+        for tunnel in tunnels where tunnel.tunnelProvider.isOnDemandEnabled {
+            let manager = tunnel.tunnelProvider
             guard let provider = manager.provider, !provider.hasStoredConfiguration() else { continue }
-            logger.notice(
-                "No stored configuration for '\(manager.localizedDescription ?? "<unknown>", privacy: .public)': turning on-demand off"
-            )
+            logger.notice("No stored configuration for '\(tunnel.name, privacy: .public)': turning on-demand off")
             manager.isOnDemandEnabled = false
             do {
-                try await manager.saveToPreferences()
+                try await performingOwnWrite { try await manager.saveToPreferences() }
             } catch {
                 logger.error("Turning on-demand off failed: \(error.logDescription, privacy: .public)")
             }
@@ -304,15 +304,19 @@ extension TunnelsService {
         logger.debug("\(tunnel.name, privacy: .public) is deactivated (status: \(String(describing: tunnel.status), privacy: .public))")
     }
 
-    /// Disables on-demand and stops the managed tunnel. Returns `false` when nothing was active.
+    /// Disables on-demand and stops the managed tunnel. On-demand is turned off also when the tunnel is already down, as
+    /// between two starts the system makes. Returns `false` when nothing was active to stop.
     @discardableResult
     func startDeactivationOfActiveTunnel() async -> Bool {
-        guard let tunnel = tunnels.last, tunnel.status != .disconnected else { return false }
+        guard let tunnel = tunnels.last else { return false }
+        let isActive = tunnel.status != .disconnected
+        guard isActive || tunnel.tunnelProvider.isOnDemandEnabled else { return false }
         do {
             try await set(onDemandEnabled: false, for: tunnel)
         } catch {
             logger.error("Failed to disable on-demand before deactivation: \(error.logDescription, privacy: .public)")
         }
+        guard isActive else { return false }
         await startDeactivation(of: tunnel)
         return true
     }

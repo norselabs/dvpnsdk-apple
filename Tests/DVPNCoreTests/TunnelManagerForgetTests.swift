@@ -87,12 +87,14 @@ struct TunnelManagerForgetTests {
             let (manager, store) = makeManager(over: profile)
             try await start(lastEngine, with: manager)
             #expect(profile.isOnDemandEnabled)
+            let saves = profile.saves
 
             manager.forgetStoredConfiguration()
             let service = try await TunnelsService.create(store: store, clock: StepClock())
 
             #expect(profile.removals == 0, "the profile was removed")
             #expect(!profile.isOnDemandEnabled, "on-demand is still on, with nothing to start from")
+            #expect(profile.saves == saves + 1, "on-demand was turned off but not saved")
             #expect(service.tunnels.count == 1)
         }
     }

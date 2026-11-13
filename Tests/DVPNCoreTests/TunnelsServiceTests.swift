@@ -221,6 +221,21 @@ struct TunnelsServiceTests {
         #expect(tunnel.status == .disconnected)
     }
 
+    /// A tunnel that is down with on-demand still on, as between two starts the system makes, has on-demand turned off,
+    /// and nothing to stop.
+    @Test
+    func stoppingADownTunnelStillTurnsOnDemandOff() async {
+        let profile = FakeTunnelProfile(name: "Xray", providerBundleID: xray.providerBundleID)
+        profile.isOnDemandEnabled = true
+        let (service, _) = makeService([profile])
+
+        #expect(await service.startDeactivationOfActiveTunnel() == false)
+
+        #expect(!profile.isOnDemandEnabled)
+        #expect(profile.saves == 1)
+        #expect(profile.stops == 0)
+    }
+
     @Test
     func withNothingConnectedStoppingDoesNothing() async {
         let profile = FakeTunnelProfile(name: "Xray", providerBundleID: xray.providerBundleID)
