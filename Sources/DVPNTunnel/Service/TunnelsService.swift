@@ -95,6 +95,8 @@ extension TunnelsService {
                 try await performingOwnWrite { try await manager.saveToPreferences() }
             } catch {
                 logger.error("Turning on-demand off failed: \(error.logDescription, privacy: .public)")
+                // The refused change stays in memory only: read the profile back as the system keeps it.
+                try? await manager.loadFromPreferences()
             }
         }
     }
@@ -316,7 +318,8 @@ extension TunnelsService {
         } catch {
             logger.error("Failed to disable on-demand before deactivation: \(error.logDescription, privacy: .public)")
         }
-        guard isActive else { return false }
+        // Read again after the save: the system may have started the tunnel on demand while it ran.
+        guard tunnel.status != .disconnected else { return false }
         await startDeactivation(of: tunnel)
         return true
     }

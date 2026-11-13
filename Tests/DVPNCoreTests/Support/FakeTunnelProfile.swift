@@ -45,6 +45,8 @@ final class FakeTunnelProfile: TunnelProfile {
     var onStart: (() -> Void)?
     /// Runs when a stop is asked for, before the provider reports `.disconnected`.
     var onStop: (() -> Void)?
+    /// Runs on every save, before its outcome (the system starting the tunnel meanwhile, for instance).
+    var onSave: (() -> Void)?
     var onStatusChange: ((FakeTunnelProfile) -> Void)?
 
     private(set) var saves = 0
@@ -71,6 +73,7 @@ final class FakeTunnelProfile: TunnelProfile {
 
     func saveToPreferences() async throws {
         saves += 1
+        onSave?()
         if let saveError { throw saveError }
         savedProviderBundleIDs.append(provider?.providerBundleIdentifier)
     }

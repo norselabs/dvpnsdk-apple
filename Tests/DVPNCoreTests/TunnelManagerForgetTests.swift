@@ -99,6 +99,50 @@ struct TunnelManagerForgetTests {
         }
     }
 
+    /// After a forget and a relaunch, the next start reuses the kept profile: no new profile is made, which is what would
+    /// make the system ask for the VPN permission again, and on-demand comes back on.
+    @Test(arguments: TunnelProtocolID.allCases)
+    func theStartAfterAForgetReusesTheProfile(engine: TunnelProtocolID) async throws {
+        try await withConfigurationFilesOfItsOwn { _ in
+            let profile = FakeTunnelProfile(name: "WireGuard", providerBundleID: "com.example.vpn.wireguard-ne")
+            let (manager, store) = makeManager(over: profile)
+            try await start(engine, with: manager)
+            manager.forgetStoredConfiguration()
+
+            let service = try await TunnelsService.create(store: store, clock: StepClock())
+            profile.onStatusChange = { [weak service] in service?.profileStatusDidChange($0) }
+            store.onMake = { [weak service] made in
+                made.onStatusChange = { [weak service] in service?.profileStatusDidChange($0) }
+            }
+            let relaunched = TunnelManager(settings: FakeTunnelSettings(), configuration: configuration)
+            relaunched.attach(service)
+            try await start(engine, with: relaunched)
+
+            #expect(store.made.isEmpty, "a new profile was made")
+            #expect(profile.removals == 0)
+            #expect(profile.isOnDemandEnabled)
+        }
+    }
+
+    /// A save the system refuses while turning on-demand off leaves the profile as the system keeps it: it is read back.
+    @Test
+    func aRefusedSaveReadsTheProfileBack() async throws {
+        struct Refused: Error {}
+        try await withConfigurationFilesOfItsOwn { _ in
+            let profile = FakeTunnelProfile(name: "WireGuard", providerBundleID: "com.example.vpn.wireguard-ne")
+            let (manager, store) = makeManager(over: profile)
+            try await start(.xray, with: manager)
+            manager.forgetStoredConfiguration()
+            profile.saveError = Refused()
+            let loads = profile.loads
+
+            _ = try await TunnelsService.create(store: store, clock: StepClock())
+
+            #expect(profile.loads == loads + 1)
+            #expect(profile.removals == 0)
+        }
+    }
+
     /// A profile whose configuration is still stored keeps on-demand as it was.
     @Test(arguments: TunnelProtocolID.allCases)
     func theNextLaunchLeavesAConfiguredProfileAlone(lastEngine: TunnelProtocolID) async throws {
