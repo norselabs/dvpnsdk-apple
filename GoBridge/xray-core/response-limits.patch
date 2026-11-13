@@ -1,0 +1,66 @@
+--- a/transport/internet/grpc/dial.go
++++ b/transport/internet/grpc/dial.go
+@@ -48,6 +48,14 @@
+ 	globalDialerAccess sync.Mutex
+ )
+ 
++// maxHeaderList is the header list size the dialer accepts in the server's response, and maxTunMessage the largest
++// message it reads in Tun mode; past either the stream fails, and a header block far past maxHeaderList ends the
++// connection. TunMulti keeps grpc-go's default of 4 MiB. Variables: the dialer refers to them in the built binary.
++var (
++	maxHeaderList uint32 = 8 * 1024
++	maxTunMessage        = 32 * 1024
++)
++
+ func dialgRPC(ctx context.Context, dest net.Destination, streamSettings *internet.MemoryStreamConfig) (net.Conn, error) {
+ 	grpcSettings := streamSettings.ProtocolSettings.(*Config)
+ 
+@@ -66,7 +74,7 @@
+ 	}
+ 
+ 	errors.LogDebug(ctx, "using gRPC tun mode service name: `"+grpcSettings.getServiceName()+"` stream name: `"+grpcSettings.getTunStreamName()+"`")
+-	grpcService, err := client.(encoding.GRPCServiceClientX).TunCustomName(ctx, grpcSettings.getServiceName(), grpcSettings.getTunStreamName())
++	grpcService, err := client.(encoding.GRPCServiceClientX).TunCustomName(ctx, grpcSettings.getServiceName(), grpcSettings.getTunStreamName(), grpc.MaxCallRecvMsgSize(maxTunMessage))
+ 	if err != nil {
+ 		return nil, errors.New("Cannot dial gRPC").Base(err)
+ 	}
+@@ -147,6 +155,7 @@
+ 	}
+ 
+ 	dialOptions = append(dialOptions, grpc.WithTransportCredentials(insecure.NewCredentials()))
++	dialOptions = append(dialOptions, grpc.WithMaxHeaderListSize(maxHeaderList))
+ 
+ 	authority := ""
+ 	if grpcSettings.Authority != "" {
+--- a/transport/internet/response_header_limit.go
++++ b/transport/internet/response_header_limit.go
+@@ -0,0 +1,5 @@
++package internet
++
++// MaxResponseHeader is how many bytes of response headers the XHTTP dialer accepts from the server over HTTP/1.1 and
++// HTTP/2; past it the request fails. A variable: each dialer that sets it refers to it in the built binary.
++var MaxResponseHeader = 64 * 1024
+--- a/transport/internet/splithttp/dialer.go
++++ b/transport/internet/splithttp/dialer.go
+@@ -255,8 +255,9 @@
+ 			DialTLSContext: func(ctxInner context.Context, network string, addr string, cfg *gotls.Config) (net.Conn, error) {
+ 				return dialContext(ctxInner)
+ 			},
+-			IdleConnTimeout: net.ConnIdleTimeout,
+-			ReadIdleTimeout: keepAlivePeriod,
++			IdleConnTimeout:   net.ConnIdleTimeout,
++			ReadIdleTimeout:   keepAlivePeriod,
++			MaxHeaderListSize: uint32(internet.MaxResponseHeader),
+ 		}
+ 	} else {
+ 		httpDialContext := func(ctxInner context.Context, network string, addr string) (net.Conn, error) {
+@@ -269,7 +270,8 @@
+ 			IdleConnTimeout: net.ConnIdleTimeout,
+ 			// chunked transfer download with KeepAlives is buggy with
+ 			// http.Client and our custom dial context.
+-			DisableKeepAlives: true,
++			DisableKeepAlives:      true,
++			MaxResponseHeaderBytes: int64(internet.MaxResponseHeader),
+ 		}
+ 	}
+ 

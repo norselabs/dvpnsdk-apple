@@ -2,8 +2,8 @@
 # Checks the engines in Frameworks/ before they are used or released: each has the five slices, each slice holds
 # the engine it is named after, and none links code this package keeps out of them — GPL or LGPL libraries, and in
 # LibXray what GoBridge/xray-core removes; LibXray's timeout reader has GoBridge/xray-core's fix, and so have the
-# handshake its WebSocket and HTTPUpgrade dialers make and the response they read, WireGuardKitGo runs on the patched
-# Go runtime, and
+# handshake its WebSocket and HTTPUpgrade dialers make, the response they read, and the response headers and gRPC
+# messages its XHTTP and gRPC dialers accept, WireGuardKitGo runs on the patched Go runtime, and
 # HevSocks5Tunnel never starts hev-task-system's stack-overflow detector and has GoBridge/hev-socks5-tunnel's session
 # cap fix. The build scripts run it after a build, and
 # scripts/check.sh and scripts/make-release-assets.sh before using what is there, so an engine built from the
@@ -48,7 +48,10 @@ refuse() {
 # relocations hold only with the fix, and the fix. Upstream's functions never reference those names.
 XRAY_CODE_FIXES='common/buf.(*TimeoutWrapperReader).ReadMultiBufferTimeout|common/buf.ErrReadTimeout|the timeout reader returning buf.ErrReadTimeout (timeout-reader-error.patch)
 transport/internet/httpupgrade.(*ConnRF).Read|httpupgrade.(*ConnRF).Read|HTTPUpgrade keeping what came with the 101 (handshake-response-limit.patch)
-transport/internet/httpupgrade.dialhttpUpgrade|_context.WithTimeout|HTTPUpgrade bounding its TLS handshake (handshake-response-limit.patch)'
+transport/internet/httpupgrade.dialhttpUpgrade|_context.WithTimeout|HTTPUpgrade bounding its TLS handshake (handshake-response-limit.patch)
+transport/internet/splithttp.createHTTPClient|internet.MaxResponseHeader|XHTTP limiting the response headers it accepts (response-limits.patch)
+transport/internet/grpc.getGrpcClient|grpc.maxHeaderList|gRPC limiting the response headers it accepts (response-limits.patch)
+transport/internet/grpc.dialgRPC|grpc.maxTunMessage|gRPC limiting the messages it reads in Tun mode (response-limits.patch)'
 
 # lacks_xray_code_fix <binary>: the first of XRAY_CODE_FIXES an architecture's Go object lacks, or nothing.
 lacks_xray_code_fix() {

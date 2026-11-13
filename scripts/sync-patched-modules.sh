@@ -17,6 +17,9 @@
 #   The same patch keeps what an HTTPUpgrade server sends with its 101 for the first reads (upstream
 #   copied it into a buffer as short as the first read, an empty one on the dial, and panicked),
 #   closes a connection whose handshake fails, and gives both dialers' TLS handshake 8 s.
+# - Xray-core's XHTTP dialer accepting at most 64 KiB of response headers over HTTP/1.1 and HTTP/2, and its gRPC
+#   dialer at most 8 KiB of response headers and, in Tun mode, messages of at most 32 KiB (response-limits.patch):
+#   Go's defaults are 10 MB of headers, 16 MB over gRPC, and 4 MiB per gRPC message.
 # - REALITY without its fallback rate limiter: it is built on github.com/juju/ratelimit (LGPL-3.0),
 #   and only a REALITY server uses it.
 #

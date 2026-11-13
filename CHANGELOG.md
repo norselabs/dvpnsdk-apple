@@ -50,6 +50,12 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   never ends: LibXray's two dialers fail once the node has sent 64 KiB before the handshake ends, and HTTPUpgrade waits
   at most 8 s for the response, as WebSocket did, unless it dials through another outbound (`dialerProxy`, as
   ClientHello fragmentation does), whose connection ignores read deadlines.
+- An Xray node dialled over XHTTP, or an Xray or V2Ray node dialled over gRPC, can no longer make LibXray hold
+  megabytes of its answers: the XHTTP dialer accepts at most 64 KiB of response headers over HTTP/1.1 and HTTP/2, and
+  the gRPC dialer at most 8 KiB of response headers and, in Tun mode, messages of at most 32 KiB. A larger answer
+  fails its request, and a gRPC header block far past the limit the connection to the node. Go's limits were 10 MB of
+  headers, 16 MB over gRPC, and 4 MiB per gRPC message, which gRPC's TunMulti mode keeps. A node whose `xPaddingBytes`
+  pads XHTTP's response headers past 64 KiB is refused.
 - An Xray or V2Ray node dialled over HTTPUpgrade can no longer crash the Xray extension by sending data in the same
   packet as its upgrade response: LibXray reads those bytes first. Both dialers also close a connection whose
   handshake fails, and give the TLS handshake 8 s, which had no limit.
