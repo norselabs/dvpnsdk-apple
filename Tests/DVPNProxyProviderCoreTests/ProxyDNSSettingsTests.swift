@@ -36,6 +36,23 @@ struct ProxyDNSSettingsTests {
         }
     }
 
+    /// Settings an override of `makeNetworkSettings(network:)` builds itself, without DNS or with plain DNS of its
+    /// own, still reach the system with the provider's DNS over HTTPS.
+    @Test(arguments: [nil, ["203.0.113.53"]] as [[String]?])
+    func settingsAnOverrideBuildsGetDNSOverHTTPS(overrideDNS: [String]?) throws {
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let built = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "254.1.1.1")
+        built.dnsSettings = overrideDNS.map { NEDNSSettings(servers: $0) }
+
+        let settings = ProxyPacketTunnelProvider.settingDNS(
+            on: built, servers: DNSServerType.cloudflare.addresses, in: defaults
+        )
+
+        let dns = try #require(settings.dnsSettings as? NEDNSOverHTTPSSettings)
+        #expect(dns.servers == [DNSServerType.cloudflare.addresses[0]])
+    }
+
     /// Resolvers of no provider stay plain DNS, as before.
     @Test
     func otherResolversStayPlainDNS() throws {

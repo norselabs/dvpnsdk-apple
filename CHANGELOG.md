@@ -21,6 +21,9 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ### Changed
 
+- A proxy tunnel's DNS settings are set after `ProxyPacketTunnelProvider.makeNetworkSettings(network:)` returns,
+  over whatever it set: a subclass that builds its own settings gets the provider's DNS over HTTPS without setting
+  it, and DNS it sets itself is replaced.
 - Each engine's stored tunnel configuration is written with `completeFileProtectionUntilFirstUserAuthentication`,
   so it is readable from the device's first unlock on, and the directory holding them is excluded from device
   backups. Files an extension writes elsewhere, such as the SOCKS5 proxy's generated settings in its own caches,
