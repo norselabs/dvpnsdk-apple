@@ -5,6 +5,8 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 
 ## Unreleased
 
+## 0.6.0 (2026-11-23)
+
 ### Added
 
 - `TunnelsServiceError.refusedNodeAddress`: `TunnelManager.start(from:)` refuses a node whose address
