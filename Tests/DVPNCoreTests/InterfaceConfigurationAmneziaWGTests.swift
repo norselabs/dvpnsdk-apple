@@ -137,8 +137,8 @@ struct InterfaceConfigurationAmneziaWGTests {
         #expect(throws: AmneziaWGParameterError.invalidValue(key: key, value: value)) { try interface.applyAmneziaWG([key: value]) }
     }
 
-    /// T1 inverted: a node's I1 with line breaks no longer adds DNS, MTU or Address lines to the file the extension
-    /// reads; without them, the value goes through and nothing else changes.
+    /// A node's I1 with line breaks is refused and adds no DNS, MTU or Address lines to the file the extension reads;
+    /// without them, the value goes through and nothing else changes.
     @Test
     func aNodeCannotAddLinesToTheStoredFile() throws {
         let stored = try TunnelConfiguration(fromWgQuickConfig: """

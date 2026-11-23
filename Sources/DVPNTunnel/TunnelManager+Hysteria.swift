@@ -24,8 +24,7 @@ extension TunnelManager {
     /// The client configuration for a backend node, as the node's own client template renders it.
     /// Node certificates are self-signed and the pin is the trust anchor, so a pinned node is dialled
     /// `insecure` like that template does. A node without a pin must show a certificate the system trusts for its
-    /// name: its own `insecure` would switch every check off, so anyone on the path could take the tunnel over. Nodes
-    /// send no `auth` of their own: the client's UUID is it.
+    /// name; its own `insecure` is ignored. Nodes send no `auth` of their own: the client's UUID is it.
     nonisolated static func configuration(for endpoint: HysteriaEndpoint, uid: String?) -> HysteriaConfiguration {
         var configuration = HysteriaConfiguration(
             server: endpoint.host,

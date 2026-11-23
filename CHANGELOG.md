@@ -38,6 +38,37 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
 - The backend's `serverInactive` code (503: the server takes no connections now) reads as
   `APIError.Reason.serverUnavailable`, whose raw value is now `serverInactive`, instead of `temporaryUnavailable`.
   Both reasons are transient.
+- On iOS and tvOS an Xray, V2Ray or Hysteria tunnel keeps fewer than 100 connections open, TCP and UDP together: the
+  one that reaches 100 closes the one quiet the longest, which had stayed open until its idle timeout.
+  hev-socks5-tunnel carries its upstream fix that keeps a burst of new connections from passing the cap.
+- Every tunnel's lookups through the system's resolver go over HTTPS (DNS over HTTPS) to the chosen
+  `DNSServerType`, inside the tunnel, so a node can no longer read or answer them. The packet tunnel providers set
+  `NEDNSOverHTTPSSettings` with the provider's endpoint, named by one of its resolvers' addresses
+  (`https://1.1.1.1/dns-query`), that address as the only server and every domain matched. Each time the settings are
+  made they name the provider's other address than the time before (`https://1.0.0.1/dns-query` after
+  `https://1.1.1.1/dns-query`, kept in App Group defaults; its first address after another provider's), so no two
+  settings in a row share an endpoint host, and settings two apart name the same one. They are made for the
+  resolvers the app stored (`TunnelManager.start(from:)`, `restart()`, and a system start from an earlier version's
+  configuration), and log which settings a start got. The system's resolver never falls back to plain DNS: where
+  the provider's HTTPS endpoint cannot be reached, names do not resolve. A program's own queries on port 53 are
+  unchanged: they travel through the tunnel as plain DNS. A WireGuard configuration whose DNS servers are not one
+  provider's keeps plain DNS.
+- `WireGuardAdapter.init(with:dnsSettings:logHandler:)` takes the tunnel's DNS settings from its owner
+  (`dnsSettings`, nil by default), which is how `WireGuardPacketTunnelProvider` sets DNS over HTTPS.
+- An AmneziaWG node sets `S1`–`S4`, `H1`–`H4` and `I1`–`I5` only: `ConnectionCredentials` reads no other key from
+  the handshake's `awg` dictionary, and `TunnelManager.start(from:)` drops any other key of
+  `AmneziaWGEndpoint.parameters`, credentials built by hand included. The junk packets (`Jc`, `Jmin`, `Jmax`) are the
+  SDK's own (`AmneziaWGJunkDefaults`), and the timing keys keep the engine's defaults.
+- An `XRAY` inbound is dialled only when its values are ones Xray-core accepts: a TLS pin is one SHA-256 digest in
+  hex (colons allowed), and a REALITY public key is 32 bytes in unpadded base64url, its short ID up to 16 hex digits
+  in pairs, and its server name empty or a host name.
+- The packet tunnel providers' log files (`ExtensionLogFile`) and their recorded start errors keep each entry on one
+  line: line breaks and other control characters in a message are escaped, so text an engine quotes from a node
+  cannot add lines that read as entries of their own.
+- `Server.name` and `City.name` are decoded without format characters (such as bidi overrides) or control
+  characters, and cut to 100 characters and 400 Unicode scalars.
+- A WireGuard or AmneziaWG tunnel to a backend node lets the system pick its local UDP port, instead of binding the
+  node's port on every interface of the device.
 
 ### Fixed
 
@@ -50,9 +81,8 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   `TunnelManager.start(from:)` no longer starts, a node at an address of the device itself, a private or shared
   network (10/8, 100.64/10, 172.16/12, 192.168/16, fc00::/7), a link (169.254/16, fe80::/10), multicast, the
   benchmarking range (198.18/15), the 0/8, 240/4 or IPv4-mapped ranges, or an IPv4-compatible (`::a.b.c.d`) or NAT64
-  (`64:ff9b::/96`) address whose IPv4 is one of those, which would send the tunnel's traffic into the user's own
-  network. An IPv4 address must be four decimal numbers, and a host name's last label must start with a letter: the
-  system's resolver reads forms such as `127.1` or `0x7f000001` as addresses.
+  (`64:ff9b::/96`) address whose IPv4 is one of those. An IPv4 address must be four decimal numbers, and a host
+  name's last label must start with a letter, so forms such as `127.1` or `0x7f000001` are refused.
 - An AmneziaWG node's values cannot crash the WireGuard extension or add settings: `applyAmneziaWG(_:)` refuses a
   value with a line break or control character, an `S4` above 388 (past which a packet no longer fits the engine's
   1700-byte buffer on iOS and tvOS), and an `I1`–`I5` that is not `<b>`, `<t>`, `<r>`, `<rc>` and `<rd>` tags with
@@ -94,41 +124,6 @@ versions follow [Semantic Versioning](https://semver.org); until 1.0.0 a minor v
   provider are never offered to `SplitTunnelProxyProvider`, which had relayed the system resolver's connections to
   them outside the tunnel, from the Mac's own address. A bypassing app's own connection to one of those addresses
   stays in the VPN too.
-
-### Changed
-
-- On iOS and tvOS an Xray, V2Ray or Hysteria tunnel keeps fewer than 100 connections open, TCP and UDP together: the
-  one that reaches 100 closes the one quiet the longest, which had stayed open until its idle timeout.
-  hev-socks5-tunnel carries its upstream fix that keeps a burst of new connections from passing the cap.
-- Every tunnel's lookups through the system's resolver go over HTTPS (DNS over HTTPS) to the chosen
-  `DNSServerType`, inside the tunnel, so a node can no longer read or answer them. The packet tunnel providers set
-  `NEDNSOverHTTPSSettings` with the provider's endpoint, named by one of its resolvers' addresses
-  (`https://1.1.1.1/dns-query`), that address as the only server and every domain matched. Each time the settings are
-  made they name the provider's other address than the time before (`https://1.0.0.1/dns-query` after
-  `https://1.1.1.1/dns-query`, kept in App Group defaults; its first address after another provider's), so no two
-  settings in a row share an endpoint host, and settings two apart name the same one. They are made for the
-  resolvers the app stored (`TunnelManager.start(from:)`, `restart()`, and a system start from an earlier version's
-  configuration), and log which settings a start got. The system's resolver never falls back to plain DNS: where
-  the provider's HTTPS endpoint cannot be reached, names do not resolve. A program's own queries on port 53 are
-  unchanged: they travel through the tunnel as plain DNS. A WireGuard configuration whose DNS servers are not one
-  provider's keeps plain DNS.
-- `WireGuardAdapter.init(with:dnsSettings:logHandler:)` takes the tunnel's DNS settings from its owner
-  (`dnsSettings`, nil by default), which is how `WireGuardPacketTunnelProvider` sets DNS over HTTPS.
-- An AmneziaWG node sets `S1`–`S4`, `H1`–`H4` and `I1`–`I5` only: `ConnectionCredentials` reads no other key from
-  the handshake's `awg` dictionary, and `TunnelManager.start(from:)` drops any other key of
-  `AmneziaWGEndpoint.parameters`, credentials built by hand included. The junk packets (`Jc`, `Jmin`, `Jmax`) are the
-  SDK's own (`AmneziaWGJunkDefaults`), and the timing keys keep the engine's defaults.
-- An `XRAY` inbound is dialled only when its values are ones Xray-core accepts: a TLS pin is one SHA-256 digest in
-  hex (colons allowed), and a REALITY public key is 32 bytes in unpadded base64url, its short ID up to 16 hex digits
-  in pairs, and its server name empty or a host name. Xray-core quotes a malformed value whole in its error.
-- The packet tunnel providers' log files (`ExtensionLogFile`) and their recorded start errors keep each entry on one
-  line: line breaks and other control characters in a message are escaped, so text an engine quotes from a node
-  cannot add lines that read as entries of their own.
-- `Server.name` and `City.name` are decoded without format characters (such as bidi overrides, which can reorder the
-  text shown after a name) or control characters, and cut to 100 characters and 400 Unicode scalars: the names come
-  from the node operators.
-- A WireGuard or AmneziaWG tunnel to a backend node lets the system pick its local UDP port, instead of binding the
-  node's port on every interface of the device.
 
 ## 0.5.1 (2026-11-04)
 

@@ -266,8 +266,8 @@ struct ConnectionCredentialsDecodingTests {
         #expect(endpoint.host == host)
     }
 
-    /// Anything else, which log lines and the WireGuard file would take as it is, fails the decoding: so does a numeric
-    /// form other than four decimal numbers, which the system's resolver reads as an address (`127.1` is 127.0.0.1).
+    /// Anything else fails the decoding: so does a numeric form other than four decimal numbers, which the system's
+    /// resolver reads as an address (`127.1` is 127.0.0.1).
     @Test(arguments: [
         "node.example.com\nStarting the tunnel", "node example.com", "node/example.com", "node\"example.com", "",
         "-node.example.com", Array(repeating: String(repeating: "a", count: 50), count: 5).joined(separator: "."),
@@ -283,9 +283,8 @@ struct ConnectionCredentialsDecodingTests {
     }
 
     /// An address of this device, a private or shared network, a link, multicast, the benchmarking range, a reserved or
-    /// IPv4-mapped range, or an IPv4-compatible or NAT64 address whose IPv4 is one of those, fails the decoding: a node
-    /// there would send the tunnel's traffic into the user's own network. One case per range, at both ends where the
-    /// range is not a whole first byte.
+    /// IPv4-mapped range, or an IPv4-compatible or NAT64 address whose IPv4 is one of those, fails the decoding. One
+    /// case per range, at both ends where the range is not a whole first byte.
     @Test(arguments: [
         "0.0.0.0", "0.255.255.255", "10.0.0.1", "10.255.255.255", "100.64.0.0", "100.127.255.255", "127.0.0.1",
         "127.255.255.254", "169.254.0.1", "169.254.169.254", "172.16.0.1", "172.31.255.255", "192.168.0.1",

@@ -19,8 +19,7 @@ public enum AmneziaWGParameterError: Error, Equatable, Sendable, CustomStringCon
         case let .unrecognizedKey(key):
             return "Unknown AmneziaWG parameter '\(key)'"
         case let .invalidValue(key, value):
-            // A value shows its length only: the header protection key is a secret the node shares with its clients, and
-            // any other value is the node's text, which could read as lines of the log.
+            // A value shows its length only, never its text.
             return "Invalid value (\(value.count) characters) for AmneziaWG parameter '\(key.escapingControlCharacters)'"
         }
     }
@@ -33,7 +32,7 @@ public extension InterfaceConfiguration {
     /// (and `AmneziaWGEndpoint.parameters`) uses: `["Jc": "4", "Jmin": "40", "H1": "1234567", …]`.
     /// Keys are matched case-insensitively; the kit's own wg-quick parser accepts the same names.
     ///
-    /// The values come from a node. Each is checked for what would harm the device, and the engine refuses the rest:
+    /// The values come from a node. Each is checked as follows, and the engine refuses the rest:
     /// no line break or control character, since the configuration is stored as wg-quick text the extension reads back
     /// line by line (a line break would add settings of the node's choice) and handed to the engine as a C string (a
     /// NUL would cut it); `S4` at most `AmneziaWGLimits.transportJunkSize`; and `I1`–`I5` as
@@ -131,8 +130,8 @@ public extension TunnelConfiguration {
 enum AmneziaWGLimits {
     /// The most `S4` leaves room for: the engine reads a packet from the tunnel into a 1700-byte buffer on iOS and tvOS
     /// (amneziawg-go's `MaxSegmentSize`) at offset 16 (the transport header) + `S4`, and seals it there with a 16-byte
-    /// tag. With the 1280-byte MTU WireGuardKit sets on iOS and tvOS when the configuration names none (the apps leave
-    /// it empty), 1700 − 16 − 1280 − 16 = 388; past 1688 the engine panics on the first packet. A larger MTU lowers it.
+    /// tag. With the 1280-byte MTU WireGuardKit sets on iOS and tvOS when the configuration names none,
+    /// 1700 − 16 − 1280 − 16 = 388; past 1688 the engine panics on the first packet. A larger MTU lowers it.
     static let transportJunkSize: UInt16 = 388
 
     /// The most bytes one I-packet, sent as one datagram, may hold.

@@ -185,7 +185,7 @@ public struct XrayInbound: Equatable, Sendable {
 ///
 /// `parameters` carries the raw `[Interface]` keys exactly as they appear in an AmneziaWG
 /// configuration. A decoded node's are the ones a node sets (`nodeParameterKeys`); the tunnel layer takes
-/// only those from any endpoint, validates and types them, since it owns the AmneziaWG model.
+/// only those from any endpoint, validates and types them.
 public struct AmneziaWGEndpoint: Equatable, Sendable {
     /// The `[Interface]` keys a node sets: `S1`–`S4`, `H1`–`H4` and `I1`–`I5`, which shape the handshake both ends
     /// must agree on. The junk packets (`Jc`, `Jmin`, `Jmax`), the timing keys and the rest are the client's own.

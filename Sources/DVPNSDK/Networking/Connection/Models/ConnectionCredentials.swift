@@ -185,8 +185,8 @@ extension ConnectionCredentials: Decodable {
 
     /// An IPv4 address written as four decimal numbers, an IPv6 address, or a host name: letters, digits and hyphens in
     /// dot-separated labels, none starting or ending with a hyphen, the last starting with a letter, at most 253
-    /// characters. The system's resolver reads other numeric forms (`127.1`, `0x7f000001`, `2130706433`) as addresses,
-    /// which `isNonPublicAddress` would have to read the same way.
+    /// characters. Other numeric forms, which the system's resolver reads as addresses (`127.1`, `0x7f000001`,
+    /// `2130706433`), are refused.
     package static func isNodeHost(_ host: String) -> Bool {
         if let address = IPv4Address(host) {
             return host == address.rawValue.map(String.init).joined(separator: ".")
@@ -202,8 +202,7 @@ extension ConnectionCredentials: Decodable {
 
     /// Whether `host` is an IP address that does not lead to the internet: this device, a private or shared network, a
     /// link, multicast, the benchmarking range, a reserved or IPv4-mapped range, or an IPv4-compatible or NAT64
-    /// address whose IPv4 is one of those. A node there would send the tunnel's traffic into the user's own network.
-    /// A host name is not checked here.
+    /// address whose IPv4 is one of those. A host name is not checked here.
     package static func isNonPublicAddress(_ host: String) -> Bool {
         if let address = IPv4Address(host) {
             return isNonPublicIPv4([UInt8](address.rawValue))

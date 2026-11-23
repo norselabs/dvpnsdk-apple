@@ -23,7 +23,7 @@ enum XrayNodeSelection {
 
     /// Shadowsocks 2022 is not modelled; a TLS inbound without a pin or a REALITY inbound without a
     /// public key could never verify, so neither is dialled. Nor is one whose pin or REALITY values Xray-core
-    /// would refuse: it quotes such a value whole in its error, which reaches the logs.
+    /// would refuse.
     static func isUsable(_ inbound: XrayInbound) -> Bool {
         guard inbound.proxyProtocol != .shadowsocks2022 else { return false }
         switch inbound.security {
